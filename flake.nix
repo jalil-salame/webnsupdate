@@ -28,7 +28,11 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in {
       default = pkgs.mkShell {
-        packages = [pkgs.cargo-insta];
+        packages = [
+          pkgs.cargo-insta
+          pkgs.cargo-udeps
+          pkgs.mold
+        ];
       };
     });
   };
