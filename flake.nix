@@ -1,31 +1,21 @@
 {
   description = "An http server that calls nsupdate internally";
-
-  inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
+  inputs = {
+    nixpkgs.url = "nixpkgs/nixos-unstable";
+    systems.url = "github:nix-systems/default";
+  };
 
   outputs = {
     self,
     nixpkgs,
+    systems,
   }: let
-    supportedSystems = ["x86_64-linux" "aarch64-darwin" "x86_64-darwin" "aarch64-linux"];
-    forEachSupportedSystem = f:
-      nixpkgs.lib.genAttrs supportedSystems (system:
-        f {
-          inherit system;
-          pkgs = import nixpkgs {inherit system;};
-        });
+    forEachSupportedSystem = nixpkgs.lib.genAttrs (import systems);
   in {
-    formatter = forEachSupportedSystem ({pkgs, ...}: pkgs.alejandra);
+    formatter = forEachSupportedSystem (system: nixpkgs.legacyPackages.${system}.alejandra);
 
-    # checks = forEachSupportedSystem ({pkgs, ...}: {
-    #   module = pkgs.testers.runNixOSTest {
-    #     name = "webnsupdate module test";
-    #     nodes.testMachine = {imports = [self.nixosModules.default];};
-    #   };
-    # });
-
-    packages = forEachSupportedSystem ({pkgs, ...}: {
-      default = pkgs.callPackage ./default.nix {};
+    packages = forEachSupportedSystem (system: {
+      default = nixpkgs.legacyPackages.${system}.callPackage ./default.nix {};
     });
 
     overlays.default = final: prev: {
@@ -34,7 +24,9 @@
 
     nixosModules.default = ./module.nix;
 
-    devShells = forEachSupportedSystem ({pkgs, ...}: {
+    devShells = forEachSupportedSystem (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+    in {
       default = pkgs.mkShell {
         packages = [pkgs.cargo-insta];
       };

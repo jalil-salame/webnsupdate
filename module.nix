@@ -13,6 +13,11 @@ in {
     type = types.submodule {
       options = {
         enable = mkEnableOption "webnsupdate";
+        extraArgs = mkOption {
+          description = ''
+            Extra arguments to be passed to the webnsupdate server command.
+          '';
+        };
         bindIp = mkOption {
           description = ''
             IP address to bind to.
@@ -130,6 +135,7 @@ in {
         wantedBy = ["multi-user.target"];
         after = ["network.target" "bind.service"];
         preStart = "${cmd} verify";
+        path = [pkgs.dig];
         startLimitIntervalSec = 60;
         serviceConfig = {
           ExecStart = [cmd];
