@@ -145,8 +145,9 @@ async fn main() -> Result<()> {
         password_hash: None,
     };
     if let Some(password_file) = password_file {
-        let pass = std::fs::read(password_file).into_diagnostic()?;
-        state.password_hash = Some(pass.leak());
+        let pass = std::fs::read_to_string(password_file).into_diagnostic()?;
+        let pass: Box<[u8]> = pass.trim().as_bytes().into();
+        state.password_hash = Some(Box::leak(pass));
     } else {
         ensure!(insecure, "a password must be used");
     }
