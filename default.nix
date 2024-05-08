@@ -20,5 +20,6 @@ in
       inherit description;
       license = lib.licenses.mit;
       homepage = "https://github.com/jalil-salame/webnsupdate";
+      mainProgram = "webnsupdate";
     };
   }

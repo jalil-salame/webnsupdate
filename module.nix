@@ -99,27 +99,25 @@ in {
       if cfg.recordsFile != null
       then cfg.recordsFile
       else pkgs.writeText "webnsrecords" cfg.records;
-    cmd = lib.concatStringsSep " " ([lib.getExe pkgs.websnupdate]
-      ++ lib.strings.escapeShellArgs [
-        "--records"
-        recordsFile
-        "--key-file"
-        cfg.keyFile
-        "--password-file"
-        cfg.passwordFile
-        "--address"
-        cfg.bindIp
-        "--port"
-        (builtins.toString cfg.bindPort)
-        "--ttl"
-        (builtins.toString cfg.ttl)
-      ]);
+    args = lib.strings.escapeShellArgs [
+      "--records"
+      recordsFile
+      "--key-file"
+      cfg.keyFile
+      "--password-file"
+      cfg.passwordFile
+      "--address"
+      cfg.bindIp
+      "--port"
+      (builtins.toString cfg.bindPort)
+      "--ttl"
+      (builtins.toString cfg.ttl)
+    ];
+    cmd = "${lib.getExe pkgs.webnsupdate} ${args}";
   in
     lib.mkIf cfg.enable {
-      warnings = [
-        (lib.optional (!config.services.bind.enable)
-          "`webnsupdate` is expected to be used alongside `bind`. This is an unsopported configuration.")
-      ];
+      # warnings =
+      #   lib.optional (!config.services.bind.enable) "`webnsupdate` is expected to be used alongside `bind`. This is an unsopported configuration.";
       assertions = [
         {
           assertion = (cfg.records != null || cfg.recordsFile != null) && !(cfg.records != null && cfg.recordsFile != null);
@@ -134,14 +132,15 @@ in {
         preStart = "${cmd} verify";
         startLimitIntervalSec = 60;
         serviceConfig = {
-          ExecStart = cmd;
-          Restart = "always";
+          ExecStart = [cmd];
+          Type = "exec";
+          Restart = "on-failure";
           RestartSec = "10s";
           # User and group
           User = cfg.user;
           Group = cfg.group;
           # Runtime directory and mode
-          RuntimeDirectory = "websnupdate";
+          RuntimeDirectory = "webnsupdate";
           RuntimeDirectoryMode = "0750";
           # Cache directory and mode
           CacheDirectory = "webnsupdate";
@@ -153,6 +152,7 @@ in {
           UMask = "0027";
           # Security
           NoNewPrivileges = true;
+          ProtectHome = true;
         };
       };
     };
