@@ -14,8 +14,11 @@
   in {
     formatter = forEachSupportedSystem (system: nixpkgs.legacyPackages.${system}.alejandra);
 
-    packages = forEachSupportedSystem (system: {
-      default = nixpkgs.legacyPackages.${system}.callPackage ./default.nix {};
+    packages = forEachSupportedSystem (system: let
+      webnsupdate = nixpkgs.legacyPackages.${system}.callPackage ./default.nix {};
+    in {
+      inherit webnsupdate;
+      default = webnsupdate;
     });
 
     overlays.default = final: prev: {
