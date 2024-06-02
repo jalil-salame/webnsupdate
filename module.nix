@@ -107,20 +107,21 @@ in {
       if cfg.recordsFile != null
       then cfg.recordsFile
       else pkgs.writeText "webnsrecords" cfg.records;
-    args = lib.strings.escapeShellArgs [
-      "--records"
-      recordsFile
-      "--key-file"
-      cfg.keyFile
-      "--password-file"
-      cfg.passwordFile
-      "--address"
-      cfg.bindIp
-      "--port"
-      (builtins.toString cfg.bindPort)
-      "--ttl"
-      (builtins.toString cfg.ttl)
-    ] ++ cfg.extraArgs;
+    args = lib.strings.escapeShellArgs ([
+        "--records"
+        recordsFile
+        "--key-file"
+        cfg.keyFile
+        "--password-file"
+        cfg.passwordFile
+        "--address"
+        cfg.bindIp
+        "--port"
+        (builtins.toString cfg.bindPort)
+        "--ttl"
+        (builtins.toString cfg.ttl)
+      ]
+      ++ cfg.extraArgs);
     cmd = "${lib.getExe pkgs.webnsupdate} ${args}";
   in
     lib.mkIf cfg.enable {
