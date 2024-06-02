@@ -17,6 +17,9 @@ in {
           description = ''
             Extra arguments to be passed to the webnsupdate server command.
           '';
+          type = types.listOf types.str;
+          default = [];
+          example = ["--ip-source"];
         };
         bindIp = mkOption {
           description = ''
@@ -117,7 +120,7 @@ in {
       (builtins.toString cfg.bindPort)
       "--ttl"
       (builtins.toString cfg.ttl)
-    ];
+    ] ++ cfg.extraArgs;
     cmd = "${lib.getExe pkgs.webnsupdate} ${args}";
   in
     lib.mkIf cfg.enable {
