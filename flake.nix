@@ -12,6 +12,27 @@
   }: let
     forEachSupportedSystem = nixpkgs.lib.genAttrs (import systems);
   in {
+    checks = forEachSupportedSystem (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+      inherit (nixpkgs) lib;
+    in {
+      fmtRust = pkgs.callPackage ./run-cmd.nix {
+        src = self;
+        name = "fmt-rust";
+        extraNativeBuildInputs = [pkgs.rustfmt];
+        cmd = "${lib.getExe pkgs.cargo} fmt --all --check --verbose";
+      };
+      fmtNix = pkgs.callPackage ./run-cmd.nix {
+        src = self;
+        name = "fmt-nix";
+        cmd = "${lib.getExe pkgs.alejandra} --check .";
+      };
+      lintNix = pkgs.callPackage ./run-cmd.nix {
+        src = self;
+        name = "lint-nix";
+        cmd = "${lib.getExe pkgs.statix} check .";
+      };
+    });
     formatter = forEachSupportedSystem (system: nixpkgs.legacyPackages.${system}.alejandra);
 
     packages = forEachSupportedSystem (system: let
