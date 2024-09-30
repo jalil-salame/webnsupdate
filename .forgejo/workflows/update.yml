@@ -1,0 +1,62 @@
+on:
+  workflow_dispatch:
+  schedule:
+    # 03:42 on Saturdays
+    - cron: '42 3 * * 6'
+env:
+  PR_TITLE: Weekly `cargo update` of dependencies
+  PR_MESSAGE: |
+    Automation to keep dependencies in `Cargo.lock` current.
+
+    The following is the output from `cargo update`:
+  COMMIT_MESSAGE: "chore: cargo update \n\n"
+jobs:
+  update-cargo:
+    runs-on: nixos
+    env:
+      BRANCH_NAME: cargo-update
+    steps:
+      - uses: https://git.salame.cl/actions/checkout@v4
+      - run: nix --version
+      - run: nix run .#cargo-update
+      - name: craft PR body and commit message
+        run: |
+          set -euo pipefail
+
+          echo "${COMMIT_MESSAGE}" > commit.txt
+          cat cargo_update.log >> commit.txt
+
+          echo "${PR_MESSAGE}" > body.md
+          echo '```txt' >> body.md
+          cat cargo_update.log >> body.md
+          echo '```' >> body.md
+      - name: commit
+        run: |
+          set -euo pipefail
+
+          git config user.name forgejo-actions
+          git config user.email forgejo-actions@salame.cl
+          git switch --force-create "$BRANCH_NAME"
+          git add ./Cargo.lock
+          DIFF="$(git diff --staged)"
+          if [[ "$DIFF" == "" ]]; then
+            echo >2 "Cargo.lock was not changed, bailing out and not making a PR"
+            exit 1
+          fi
+          git commit --no-verify --file=commit.txt
+      - name: push
+        run: |
+          set -euo pipefail
+          git push --no-verify --force --set-upstream origin "$BRANCH_NAME"
+      - name: open new pull request
+        env:
+          # We have to use a Personal Access Token (PAT) here.
+          # PRs opened from a workflow using the standard `GITHUB_TOKEN` in GitHub Actions
+          # do not automatically trigger more workflows:
+          # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
+          # GITHUB_TOKEN: ${{ secrets.DEPS_UPDATER_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tea login add --name "forgejo-actions" --token "$GITHUB_TOKEN"
+          tea pr create --title "${PR_TITLE}" --description "$(cat body.md)" --repo "$GITHUB_REPOSITORY"

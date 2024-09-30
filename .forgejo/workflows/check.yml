@@ -3,12 +3,12 @@ jobs:
   check:
     runs-on: nixos
     steps:
-      - uses: https://code.forgejo.org/actions/checkout@v4
+      - uses: https://git.salame.cl/actions/checkout@v4
       - run: nix --version
       - run: nix flake check --keep-going --verbose --print-build-logs
   build:
     runs-on: nixos
     steps:
-      - uses: https://code.forgejo.org/actions/checkout@v4
+      - uses: https://git.salame.cl/actions/checkout@v4
       - run: nix --version
       - run: nix build --print-build-logs .#

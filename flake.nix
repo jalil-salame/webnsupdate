@@ -45,18 +45,26 @@
       packages = forEachSupportedSystem (
         system:
         let
-          webnsupdate = nixpkgs.legacyPackages.${system}.callPackage ./default.nix { };
+          pkgs = nixpkgs.legacyPackages.${system};
+          webnsupdate = pkgs.callPackage ./default.nix { };
         in
         {
           inherit webnsupdate;
           default = webnsupdate;
-
+          cargo-update = pkgs.writeShellApplication {
+            name = "cargo-update-lockfile";
+            runtimeInputs = with pkgs; [
+              cargo
+              gnused
+            ];
+            text = ''
+              CARGO_TERM_COLOR=never cargo update 2>&1 | sed '/crates.io index/d' | tee -a cargo_update.log
+            '';
+          };
         }
       );
 
-      overlays.default = final: prev: {
-        webnsupdate = final.callPackage ./default.nix { };
-      };
+      overlays.default = final: prev: { webnsupdate = final.callPackage ./default.nix { }; };
 
       nixosModules.default = ./module.nix;
 
