@@ -3,8 +3,8 @@
   src,
   name,
   cmd,
-  extraBuildInputs ? [],
-  extraNativeBuildInputs ? [],
+  extraBuildInputs ? [ ],
+  extraNativeBuildInputs ? [ ],
 }:
 stdenvNoCC.mkDerivation {
   name = "${name}-src";

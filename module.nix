@@ -3,13 +3,15 @@
   pkgs,
   config,
   ...
-}: let
+}:
+let
   cfg = config.services.webnsupdate;
   inherit (lib) mkOption mkEnableOption types;
-in {
+in
+{
   options.services.webnsupdate = mkOption {
     description = "An HTTP server for nsupdate.";
-    default = {};
+    default = { };
     type = types.submodule {
       options = {
         enable = mkEnableOption "webnsupdate";
@@ -18,8 +20,8 @@ in {
             Extra arguments to be passed to the webnsupdate server command.
           '';
           type = types.listOf types.str;
-          default = [];
-          example = ["--ip-source"];
+          default = [ ];
+          example = [ "--ip-source" ];
         };
         bindIp = mkOption {
           description = ''
@@ -102,47 +104,53 @@ in {
     };
   };
 
-  config = let
-    recordsFile =
-      if cfg.recordsFile != null
-      then cfg.recordsFile
-      else pkgs.writeText "webnsrecords" cfg.records;
-    args = lib.strings.escapeShellArgs ([
-        "--records"
-        recordsFile
-        "--key-file"
-        cfg.keyFile
-        "--password-file"
-        cfg.passwordFile
-        "--address"
-        cfg.bindIp
-        "--port"
-        (builtins.toString cfg.bindPort)
-        "--ttl"
-        (builtins.toString cfg.ttl)
-      ]
-      ++ cfg.extraArgs);
-    cmd = "${lib.getExe pkgs.webnsupdate} ${args}";
-  in
+  config =
+    let
+      recordsFile =
+        if cfg.recordsFile != null then cfg.recordsFile else pkgs.writeText "webnsrecords" cfg.records;
+      args = lib.strings.escapeShellArgs (
+        [
+          "--records"
+          recordsFile
+          "--key-file"
+          cfg.keyFile
+          "--password-file"
+          cfg.passwordFile
+          "--address"
+          cfg.bindIp
+          "--port"
+          (builtins.toString cfg.bindPort)
+          "--ttl"
+          (builtins.toString cfg.ttl)
+        ]
+        ++ cfg.extraArgs
+      );
+      cmd = "${lib.getExe pkgs.webnsupdate} ${args}";
+    in
     lib.mkIf cfg.enable {
       # warnings =
       #   lib.optional (!config.services.bind.enable) "`webnsupdate` is expected to be used alongside `bind`. This is an unsopported configuration.";
       assertions = [
         {
-          assertion = (cfg.records != null || cfg.recordsFile != null) && !(cfg.records != null && cfg.recordsFile != null);
+          assertion =
+            (cfg.records != null || cfg.recordsFile != null)
+            && !(cfg.records != null && cfg.recordsFile != null);
           message = "Exactly one of `services.webnsupdate.records` and `services.webnsupdate.recordsFile` must be set.";
         }
       ];
 
       systemd.services.webnsupdate = {
         description = "Web interface for nsupdate.";
-        wantedBy = ["multi-user.target"];
-        after = ["network.target" "bind.service"];
+        wantedBy = [ "multi-user.target" ];
+        after = [
+          "network.target"
+          "bind.service"
+        ];
         preStart = "${cmd} verify";
-        path = [pkgs.dig];
+        path = [ pkgs.dig ];
         startLimitIntervalSec = 60;
         serviceConfig = {
-          ExecStart = [cmd];
+          ExecStart = [ cmd ];
           Type = "exec";
           Restart = "on-failure";
           RestartSec = "10s";
