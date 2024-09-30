@@ -1,7 +1,4 @@
-{
-  lib,
-  rustPlatform,
-}:
+{ lib, rustPlatform }:
 let
   readToml = path: builtins.fromTOML (builtins.readFile path);
   cargoToml = readToml ./Cargo.toml;
@@ -17,7 +14,6 @@ let
       let
         path = toString orig_path;
         base = baseNameOf path;
-        parentDir = baseNameOf (dirOf path);
         matchesSuffix = lib.any (suffix: lib.hasSuffix suffix base) [
           # Rust sources
           ".rs"
@@ -25,16 +21,16 @@ let
           ".toml"
         ];
         isCargoLock = base == "Cargo.lock";
-        # .cargo/config.toml is captured above
-        isOldStyleCargoConfig = parentDir == ".cargo" && base == "config";
       in
-      type == "directory" || matchesSuffix || isCargoLock || isOldStyleCargoConfig;
+      type == "directory" || matchesSuffix || isCargoLock;
   };
 in
 rustPlatform.buildRustPackage {
   inherit pname version src;
   cargoLock.lockFile = ./Cargo.lock;
   useNextest = true;
+  NEXTEST_HIDE_PROGRESS_BAR = 1;
+  NEXTEST_FAILURE_OUTPUT = "immediate-final";
 
   meta = {
     inherit description;
