@@ -1,4 +1,5 @@
 cargo-features = ["codegen-backend"]
+
 [package]
 description = "An HTTP server using HTTP basic auth to make secure calls to nsupdate"
 name = "webnsupdate"
@@ -7,24 +8,26 @@ edition = "2021"
 
 [dependencies]
 axum = "0.7.7"
+axum-auth = { version = "0.7.0", default-features = false, features = [
+  "auth-basic",
+] }
 axum-client-ip = "0.6.1"
 base64 = "0.22.1"
 clap = { version = "4.5.20", features = ["derive", "env"] }
 http = "1.1.0"
-insta = "1.40.0"
 miette = { version = "7.2.0", features = ["fancy"] }
 ring = { version = "0.17.8", features = ["std"] }
+tokio = { version = "1.40.0", features = [
+  "macros",
+  "rt",
+  "process",
+  "io-util",
+] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
-[dependencies.axum-auth]
-version = "0.7.0"
-default-features = false
-features = ["auth-basic"]
-
-[dependencies.tokio]
-version = "1.40.0"
-features = ["macros", "rt", "process", "io-util"]
+[dev-dependencies]
+insta = "1.40.0"
 
 [profile.dev]
 debug = 0

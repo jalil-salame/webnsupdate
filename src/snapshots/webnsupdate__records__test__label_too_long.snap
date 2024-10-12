@@ -1,0 +1,16 @@
+---
+source: src/records.rs
+description: err
+expression: out
+---
+]8;;https://en.wikipedia.org/wiki/Fully_qualified_domain_name\(link)]8;;\
+
+  × label too long (78 octets)
+   ╭─[test_records_invalid:2:6]
+ 1 │ example.com.
+ 2 │ name.an-entremely-long-label-that-should-not-exist-because-it-goes-against-the-spec.example.org.
+   ·      ───────────────────────────────────────┬──────────────────────────────────────
+   ·                                             ╰── label
+ 3 │ example.net.
+   ╰────
+  help: labels should be at most 63 octets

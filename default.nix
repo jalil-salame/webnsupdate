@@ -19,6 +19,8 @@ let
           ".rs"
           # TOML files are often used to configure cargo based tools (e.g. .cargo/config.toml)
           ".toml"
+          # Snapshot tests
+          ".snap"
         ];
         isCargoLock = base == "Cargo.lock";
       in

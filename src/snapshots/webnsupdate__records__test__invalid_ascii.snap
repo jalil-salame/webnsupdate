@@ -1,0 +1,16 @@
+---
+source: src/records.rs
+description: err
+expression: out
+---
+]8;;https://en.wikipedia.org/wiki/Hostname#Syntax\(link)]8;;\
+
+  × invalid octet: '\xc3'
+   ╭─[test_records_invalid:2:19]
+ 1 │ example.com.
+ 2 │ name.this-is-not-aßcii.example.org.
+   ·                   ┬
+   ·                   ╰── octet
+ 3 │ example.net.
+   ╰────
+  help: we only accept ascii characters
