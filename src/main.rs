@@ -12,6 +12,7 @@ use axum_auth::AuthBasic;
 use axum_client_ip::{SecureClientIp, SecureClientIpSource};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use clap::{Parser, Subcommand};
+use clap_verbosity_flag::Verbosity;
 use http::StatusCode;
 use miette::{bail, ensure, Context, IntoDiagnostic, Result};
 use tokio::io::AsyncWriteExt;
@@ -26,6 +27,9 @@ const DEFAULT_SALT: &str = "UpdateMyDNS";
 
 #[derive(Debug, Parser)]
 struct Opts {
+    #[command(flatten)]
+    verbosity: Verbosity,
+
     /// Ip address of the server
     #[arg(long, default_value = "127.0.0.1")]
     address: IpAddr,
@@ -121,6 +125,7 @@ struct AppState<'a> {
 }
 
 fn load_ip(path: &Path) -> Result<Option<IpAddr>> {
+    debug!("loading last IP from {}", path.display());
     let data = match std::fs::read_to_string(path) {
         Ok(ip) => ip,
         Err(err) => {
@@ -146,13 +151,28 @@ fn main() -> Result<()> {
 
     // parse cli arguments
     let mut args = Opts::parse();
+    debug!("{args:?}");
 
     // configure logger
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .without_time()
         .with_env_filter(
             EnvFilter::builder()
-                .with_default_directive(LevelFilter::WARN.into())
+                .with_default_directive(
+                    if args.verbosity.is_present() {
+                        match args.verbosity.log_level_filter() {
+                            clap_verbosity_flag::LevelFilter::Off => LevelFilter::OFF,
+                            clap_verbosity_flag::LevelFilter::Error => LevelFilter::ERROR,
+                            clap_verbosity_flag::LevelFilter::Warn => LevelFilter::WARN,
+                            clap_verbosity_flag::LevelFilter::Info => LevelFilter::INFO,
+                            clap_verbosity_flag::LevelFilter::Debug => LevelFilter::DEBUG,
+                            clap_verbosity_flag::LevelFilter::Trace => LevelFilter::TRACE,
+                        }
+                    } else {
+                        LevelFilter::WARN
+                    }
+                    .into(),
+                )
                 .from_env_lossy(),
         )
         .finish();
@@ -166,6 +186,7 @@ fn main() -> Result<()> {
     }
 
     let Opts {
+        verbosity: _,
         address: ip,
         port,
         password_file,
@@ -287,6 +308,7 @@ async fn update_records(
     AuthBasic((username, pass)): AuthBasic,
     SecureClientIp(ip): SecureClientIp,
 ) -> axum::response::Result<&'static str> {
+    debug!("received update request from {ip}");
     let Some(pass) = pass else {
         return Err((StatusCode::UNAUTHORIZED, Json::from("no password provided")).into());
     };
@@ -309,9 +331,11 @@ async fn update_records(
     match nsupdate(ip, state.ttl, state.key_file, state.records).await {
         Ok(status) if status.success() => {
             tokio::task::spawn_blocking(move || {
+                info!("updating last ip to {ip}");
                 if let Err(err) = std::fs::write(state.ip_file, format!("{ip}")) {
                     error!("Failed to update last IP: {err}");
                 }
+                info!("updated last ip to {ip}");
             });
             Ok("successful update")
         }
