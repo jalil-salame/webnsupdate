@@ -5,6 +5,7 @@
     ./package.nix
     ./overlay.nix
     ./module.nix
+    ./tests.nix
   ];
 
   perSystem =
