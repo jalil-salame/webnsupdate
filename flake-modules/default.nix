@@ -3,7 +3,6 @@
   imports = [
     inputs.treefmt-nix.flakeModule
     ./package.nix
-    ./overlay.nix
     ./module.nix
     ./tests.nix
   ];

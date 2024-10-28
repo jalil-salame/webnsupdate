@@ -1,7 +1,16 @@
-{ inputs, lib, ... }:
+{ withSystem, inputs, ... }:
 {
+  flake.overlays.default =
+    final: prev:
+    withSystem prev.stdenv.hostPlatform.system (
+      { self', ... }:
+      {
+        inherit (self'.packages) webnsupdate;
+      }
+    );
+
   perSystem =
-    { pkgs, ... }:
+    { pkgs, lib, ... }:
     let
       craneLib = inputs.crane.mkLib pkgs;
       src = craneLib.cleanCargoSource inputs.self;
