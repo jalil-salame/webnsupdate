@@ -1,12 +1,13 @@
 {
   description = "An http server that calls nsupdate internally";
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-unstable";
-    systems.url = "github:nix-systems/default";
+    crane.url = "github:ipetkov/crane";
     flake-parts = {
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
+    nixpkgs.url = "nixpkgs/nixos-unstable";
+    systems.url = "github:nix-systems/default";
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
