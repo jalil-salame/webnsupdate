@@ -77,7 +77,7 @@ struct Opts {
 
     /// Set client IP source
     ///
-    /// see: https://docs.rs/axum-client-ip/latest/axum_client_ip/enum.SecureClientIpSource.html
+    /// see: <https://docs.rs/axum-client-ip/latest/axum_client_ip/enum.SecureClientIpSource.html>
     #[clap(long, default_value = "RightmostXForwardedFor")]
     ip_source: SecureClientIpSource,
 
@@ -281,19 +281,16 @@ fn main() -> Result<()> {
                     }
                 }
             }
-            Ok(None) => {
-                info!("No previous IP address set");
-            }
-            Err(err) => {
-                error!("Failed to load last ip address: {err}")
-            }
+            Ok(None) => info!("No previous IP address set"),
+
+            Err(err) => error!("Failed to load last ip address: {err}"),
         };
 
         // Create services
         let app = Router::new().route("/update", get(update_records));
         // if a password is provided, validate it
         let app = if let Some(pass) = password_hash {
-            app.layer(auth::auth_layer(Box::leak(pass), String::leak(salt)))
+            app.layer(auth::layer(Box::leak(pass), String::leak(salt)))
         } else {
             app
         }

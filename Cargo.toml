@@ -5,6 +5,16 @@ description = "An HTTP server using HTTP basic auth to make secure calls to nsup
 name = "webnsupdate"
 version = "0.3.2-dev"
 edition = "2021"
+license-file = "LICENSE"
+readme = "README.md"
+keywords = ["dns", "dyndns", "dynamic-ip"]
+categories = ["networking", "dns", "dyndns"]
+repository = "https://github.com/jalil-salame/webnsupdate"
+
+[lints.clippy]
+cargo = { level = "warn", priority = -2 }
+multiple_crate_versions = "allow"
+pedantic = { level = "warn", priority = -1 }
 
 [dependencies]
 axum = "0.7"

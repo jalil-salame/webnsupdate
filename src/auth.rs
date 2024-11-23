@@ -5,21 +5,21 @@ use tracing::{trace, warn};
 
 use crate::password;
 
-pub fn auth_layer<'a, ResBody>(
+pub fn layer<'a, ResBody>(
     user_pass_hash: &'a [u8],
     salt: &'a str,
-) -> ValidateRequestHeaderLayer<BasicAuth<'a, ResBody>> {
-    ValidateRequestHeaderLayer::custom(BasicAuth::new(user_pass_hash, salt))
+) -> ValidateRequestHeaderLayer<Basic<'a, ResBody>> {
+    ValidateRequestHeaderLayer::custom(Basic::new(user_pass_hash, salt))
 }
 
 #[derive(Copy)]
-pub struct BasicAuth<'a, ResBody> {
+pub struct Basic<'a, ResBody> {
     pass: &'a [u8],
     salt: &'a str,
     _ty: std::marker::PhantomData<fn() -> ResBody>,
 }
 
-impl<ResBody> std::fmt::Debug for BasicAuth<'_, ResBody> {
+impl<ResBody> std::fmt::Debug for Basic<'_, ResBody> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BasicAuth")
             .field("pass", &self.pass)
@@ -29,7 +29,7 @@ impl<ResBody> std::fmt::Debug for BasicAuth<'_, ResBody> {
     }
 }
 
-impl<ResBody> Clone for BasicAuth<'_, ResBody> {
+impl<ResBody> Clone for Basic<'_, ResBody> {
     fn clone(&self) -> Self {
         Self {
             pass: self.pass,
@@ -39,7 +39,7 @@ impl<ResBody> Clone for BasicAuth<'_, ResBody> {
     }
 }
 
-impl<'a, ResBody> BasicAuth<'a, ResBody> {
+impl<'a, ResBody> Basic<'a, ResBody> {
     pub fn new(pass: &'a [u8], salt: &'a str) -> Self {
         Self {
             pass,
@@ -81,7 +81,7 @@ impl<'a, ResBody> BasicAuth<'a, ResBody> {
     }
 }
 
-impl<B, ResBody> tower_http::validate_request::ValidateRequest<B> for BasicAuth<'_, ResBody>
+impl<B, ResBody> tower_http::validate_request::ValidateRequest<B> for Basic<'_, ResBody>
 where
     ResBody: Default,
 {
