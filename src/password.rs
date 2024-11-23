@@ -28,10 +28,20 @@ impl Mkpasswd {
     }
 }
 
+pub fn hash_basic_auth(user_pass: &[u8], salt: &str) -> Digest {
+    let mut context = ring::digest::Context::new(&ring::digest::SHA256);
+    context.update(user_pass);
+    context.update(salt.as_bytes());
+    context.finish()
+}
+
 pub fn hash_identity(username: &str, password: &str, salt: &str) -> Digest {
-    let mut data = Vec::with_capacity(username.len() + password.len() + salt.len() + 1);
-    write!(data, "{username}:{password}{salt}").unwrap();
-    ring::digest::digest(&ring::digest::SHA256, &data)
+    let mut context = ring::digest::Context::new(&ring::digest::SHA256);
+    context.update(username.as_bytes());
+    context.update(b":");
+    context.update(password.as_bytes());
+    context.update(salt.as_bytes());
+    context.finish()
 }
 
 pub fn mkpasswd(

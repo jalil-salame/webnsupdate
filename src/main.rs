@@ -7,8 +7,7 @@ use std::{
     time::Duration,
 };
 
-use axum::{extract::State, routing::get, Json, Router};
-use axum_auth::AuthBasic;
+use axum::{extract::State, routing::get, Router};
 use axum_client_ip::{SecureClientIp, SecureClientIpSource};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use clap::{Parser, Subcommand};
@@ -16,9 +15,10 @@ use clap_verbosity_flag::Verbosity;
 use http::StatusCode;
 use miette::{bail, ensure, Context, IntoDiagnostic, Result};
 use tokio::io::AsyncWriteExt;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 
+mod auth;
 mod password;
 mod records;
 
@@ -108,17 +108,11 @@ struct AppState<'a> {
     /// TTL set on the Zonefile
     ttl: Duration,
 
-    /// Salt added to the password
-    salt: &'a str,
-
     /// The IN A/AAAA records that should have their IPs updated
     records: &'a [&'a str],
 
     /// The TSIG key file
     key_file: Option<&'a Path>,
-
-    /// The password hash
-    password_hash: Option<&'a [u8]>,
 
     /// The file where the last IP is stored
     ip_file: &'a Path,
@@ -195,9 +189,23 @@ fn main() -> Result<()> {
     // Use last registered IP address if available
     let ip_file = data_dir.join("last-ip");
 
+    // Load password hash
+    let password_hash = password_file
+        .map(|path| -> miette::Result<_> {
+            let pass = std::fs::read_to_string(path.as_path()).into_diagnostic()?;
+
+            let pass: Box<[u8]> = URL_SAFE_NO_PAD
+                .decode(pass.trim().as_bytes())
+                .into_diagnostic()
+                .wrap_err_with(|| format!("failed to decode password from {}", path.display()))?
+                .into();
+
+            Ok(pass)
+        })
+        .transpose()?;
+
     let state = AppState {
         ttl,
-        salt: salt.leak(),
         // Load DNS records
         records: records::load_no_verify(&records)?,
         // Load keyfile
@@ -212,25 +220,11 @@ fn main() -> Result<()> {
                 Ok(&*Box::leak(key_file.into_boxed_path()))
             })
             .transpose()?,
-        // Load password hash
-        password_hash: password_file
-            .map(|path| -> miette::Result<_> {
-                let pass = std::fs::read_to_string(path.as_path()).into_diagnostic()?;
-
-                let pass: Box<[u8]> = URL_SAFE_NO_PAD
-                    .decode(pass.trim().as_bytes())
-                    .into_diagnostic()
-                    .wrap_err_with(|| format!("failed to decode password from {}", path.display()))?
-                    .into();
-
-                Ok(&*Box::leak(pass))
-            })
-            .transpose()?,
         ip_file: Box::leak(ip_file.into_boxed_path()),
     };
 
     ensure!(
-        state.password_hash.is_some() || insecure,
+        password_hash.is_some() || insecure,
         "a password must be used"
     );
 
@@ -270,11 +264,18 @@ fn main() -> Result<()> {
             }
         };
 
+        // Create services
+        let app = Router::new().route("/update", get(update_records));
+        // if a password is provided, validate it
+        let app = if let Some(pass) = password_hash {
+            app.layer(auth::auth_layer(Box::leak(pass), String::leak(salt)))
+        } else {
+            app
+        }
+        .layer(ip_source.into_extension())
+        .with_state(state);
+
         // Start services
-        let app = Router::new()
-            .route("/update", get(update_records))
-            .layer(ip_source.into_extension())
-            .with_state(state);
         info!("starting listener on {ip}:{port}");
         let listener = tokio::net::TcpListener::bind(SocketAddr::new(ip, port))
             .await
@@ -289,31 +290,12 @@ fn main() -> Result<()> {
     })
 }
 
-#[tracing::instrument(skip(state, pass), level = "trace", ret(level = "info"))]
+#[tracing::instrument(skip(state), level = "trace", ret(level = "info"))]
 async fn update_records(
     State(state): State<AppState<'static>>,
-    AuthBasic((username, pass)): AuthBasic,
     SecureClientIp(ip): SecureClientIp,
 ) -> axum::response::Result<&'static str> {
     debug!("received update request from {ip}");
-    let Some(pass) = pass else {
-        return Err((StatusCode::UNAUTHORIZED, Json::from("no password provided")).into());
-    };
-
-    if let Some(stored_pass) = state.password_hash {
-        let password = pass.trim().to_string();
-        let pass_hash = password::hash_identity(&username, &password, state.salt);
-        if pass_hash.as_ref() != stored_pass {
-            warn!("rejected update");
-            trace!(
-                "mismatched hashes:\n{}\n{}",
-                URL_SAFE_NO_PAD.encode(pass_hash.as_ref()),
-                URL_SAFE_NO_PAD.encode(stored_pass),
-            );
-            return Err((StatusCode::UNAUTHORIZED, "invalid identity").into());
-        }
-    }
-
     info!("accepted update");
     match nsupdate(ip, state.ttl, state.key_file, state.records).await {
         Ok(status) if status.success() => {

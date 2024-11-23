@@ -121,18 +121,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum-auth"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8169113a185f54f68614fcfc3581df585d30bf8542bcb99496990e1025e4120a"
-dependencies = [
- "async-trait",
- "axum-core",
- "base64 0.21.7",
- "http",
-]
-
-[[package]]
 name = "axum-client-ip"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -187,12 +175,6 @@ checksum = "537beee3be4a18fb023b570f80e3ae28003db9167a751266b259926e25539d50"
 dependencies = [
  "backtrace",
 ]
-
-[[package]]
-name = "base64"
-version = "0.21.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "base64"
@@ -1045,6 +1027,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tower-http"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "403fa3b783d4b626a8ad51d766ab03cb6d2dbfc46b1c5d4448395e6628dc9697"
+dependencies = [
+ "bitflags",
+ "bytes",
+ "http",
+ "mime",
+ "pin-project-lite",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
 name = "tower-layer"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1165,9 +1162,8 @@ name = "webnsupdate"
 version = "0.3.2-dev"
 dependencies = [
  "axum",
- "axum-auth",
  "axum-client-ip",
- "base64 0.22.1",
+ "base64",
  "clap",
  "clap-verbosity-flag",
  "http",
@@ -1175,6 +1171,7 @@ dependencies = [
  "miette",
  "ring",
  "tokio",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
 ]
