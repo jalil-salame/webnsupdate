@@ -14,16 +14,13 @@ axum-auth = { version = "0.7", default-features = false, features = [
 axum-client-ip = "0.6"
 base64 = "0.22"
 clap = { version = "4", features = ["derive", "env"] }
-clap-verbosity-flag = "2"
+clap-verbosity-flag = { version = "3", default-features = false, features = [
+  "tracing",
+] }
 http = "1"
 miette = { version = "7", features = ["fancy"] }
 ring = { version = "0.17", features = ["std"] }
-tokio = { version = "1", features = [
-  "macros",
-  "rt",
-  "process",
-  "io-util",
-] }
+tokio = { version = "1", features = ["macros", "rt", "process", "io-util"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

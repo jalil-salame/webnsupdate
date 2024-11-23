@@ -16,7 +16,7 @@ use clap_verbosity_flag::Verbosity;
 use http::StatusCode;
 use miette::{bail, ensure, Context, IntoDiagnostic, Result};
 use tokio::io::AsyncWriteExt;
-use tracing::{debug, error, info, level_filters::LevelFilter, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::EnvFilter;
 
 mod password;
@@ -28,7 +28,7 @@ const DEFAULT_SALT: &str = "UpdateMyDNS";
 #[derive(Debug, Parser)]
 struct Opts {
     #[command(flatten)]
-    verbosity: Verbosity,
+    verbosity: Verbosity<clap_verbosity_flag::WarnLevel>,
 
     /// Ip address of the server
     #[arg(long, default_value = "127.0.0.1")]
@@ -151,34 +151,21 @@ fn main() -> Result<()> {
 
     // parse cli arguments
     let mut args = Opts::parse();
-    debug!("{args:?}");
 
     // configure logger
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .without_time()
         .with_env_filter(
             EnvFilter::builder()
-                .with_default_directive(
-                    if args.verbosity.is_present() {
-                        match args.verbosity.log_level_filter() {
-                            clap_verbosity_flag::LevelFilter::Off => LevelFilter::OFF,
-                            clap_verbosity_flag::LevelFilter::Error => LevelFilter::ERROR,
-                            clap_verbosity_flag::LevelFilter::Warn => LevelFilter::WARN,
-                            clap_verbosity_flag::LevelFilter::Info => LevelFilter::INFO,
-                            clap_verbosity_flag::LevelFilter::Debug => LevelFilter::DEBUG,
-                            clap_verbosity_flag::LevelFilter::Trace => LevelFilter::TRACE,
-                        }
-                    } else {
-                        LevelFilter::WARN
-                    }
-                    .into(),
-                )
+                .with_default_directive(args.verbosity.tracing_level_filter().into())
                 .from_env_lossy(),
         )
         .finish();
     tracing::subscriber::set_global_default(subscriber)
         .into_diagnostic()
         .wrap_err("setting global tracing subscriber")?;
+
+    debug!("{args:?}");
 
     // process subcommand
     if let Some(cmd) = args.subcommand.take() {
