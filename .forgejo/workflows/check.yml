@@ -1,14 +1,15 @@
 on: [push]
 jobs:
-  check:
-    runs-on: nixos
-    steps:
-      - uses: https://git.salame.cl/actions/checkout@v4
-      - run: nix --version
-      - run: nix flake check --keep-going --verbose --print-build-logs
   build:
     runs-on: nixos
     steps:
       - uses: https://git.salame.cl/actions/checkout@v4
       - run: nix --version
       - run: nix build --print-build-logs .#
+  check:
+    needs: build # we use the built binaries in the checks
+    runs-on: nixos
+    steps:
+      - uses: https://git.salame.cl/actions/checkout@v4
+      - run: nix --version
+      - run: nix flake check --keep-going --verbose --print-build-logs
