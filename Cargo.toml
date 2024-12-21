@@ -35,6 +35,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 [dev-dependencies]
 insta = "1"
 
+[profile.release]
+opt-level = "s"
+panic = "abort"
+lto = true
+strip = true
+
 [profile.dev]
 debug = 0
 codegen-backend = "cranelift"
