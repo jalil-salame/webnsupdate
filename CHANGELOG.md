@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.3.3] - 2024-12-22
 
 ### 🚀 Features
 
@@ -12,11 +12,13 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - *(webnsupdate)* Reduce binary size
+- *(ci)* Remove tea
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(flake.lock)* Update inputs
 - Cargo update
+- Generate base changelog
 
 ## [0.3.2] - 2024-11-23
 
