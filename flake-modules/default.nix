@@ -22,10 +22,11 @@
       };
 
       devShells.default = pkgs.mkShellNoCC {
-        packages = [
-          pkgs.cargo-insta
-          pkgs.cargo-udeps
-          pkgs.mold
+        packages = with pkgs; [
+          cargo-insta
+          cargo-udeps
+          mold
+          git-cliff
         ];
       };
     };

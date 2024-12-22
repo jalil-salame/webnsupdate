@@ -62,6 +62,7 @@
 
       packages = {
         inherit webnsupdate;
+        inherit (pkgs) git-cliff;
         default = webnsupdate;
         cargo-update = pkgs.writeShellApplication {
           name = "cargo-update-lockfile";
