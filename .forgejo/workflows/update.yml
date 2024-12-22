@@ -9,7 +9,7 @@ env:
     Automation to keep dependencies in `Cargo.lock` current.
 
     The following is the output from `cargo update`:
-  COMMIT_MESSAGE: "chore: cargo update \n\n"
+  COMMIT_MESSAGE: "chore(deps): cargo update"
 jobs:
   update-cargo:
     runs-on: nixos
@@ -24,6 +24,7 @@ jobs:
           set -xeuo pipefail
 
           echo "${COMMIT_MESSAGE}" > commit.txt
+          printf '\n\n' >> commit.txt
           cat cargo_update.log >> commit.txt
 
           echo "${PR_MESSAGE}" > body.md
@@ -54,9 +55,17 @@ jobs:
           # PRs opened from a workflow using the standard `GITHUB_TOKEN` in GitHub Actions
           # do not automatically trigger more workflows:
           # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
-          # GITHUB_TOKEN: ${{ secrets.DEPS_UPDATER_GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -xeuo pipefail
-          tea login add --token "$GITHUB_TOKEN"
-          tea pr create --title "${PR_TITLE}" --description "$(cat body.md)" --repo "$GITHUB_REPOSITORY"
+          set -euo pipefail
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d "$(
+              echo '{}' |
+                jq --arg body "$(cat body.md)" \
+                  --arg title "$COMMIT_MESSAGE" \
+                  --arg head "$BRANCH_NAME" \
+                  '{"body": $body, "title": $title, "head": $head, "base": "main"}'
+            )" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls"
