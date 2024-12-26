@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.4] - 2024-12-26
+
+### 🐛 Bug Fixes
+
+- *(main)* Add more logging and default to info
+
 ## [0.3.3] - 2024-12-22
 
 ### 🚀 Features

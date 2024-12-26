@@ -26,7 +26,7 @@ const DEFAULT_SALT: &str = "UpdateMyDNS";
 #[derive(Debug, Parser)]
 struct Opts {
     #[command(flatten)]
-    verbosity: Verbosity<clap_verbosity_flag::WarnLevel>,
+    verbosity: Verbosity<clap_verbosity_flag::InfoLevel>,
 
     /// Ip address of the server
     #[arg(long, default_value = "127.0.0.1")]
@@ -188,6 +188,7 @@ fn load_ip(path: &Path) -> Result<Option<IpAddr>> {
     ))
 }
 
+#[tracing::instrument(err)]
 fn main() -> Result<()> {
     // set panic hook to pretty print with miette's formatter
     miette::set_panic_hook();
@@ -204,9 +205,10 @@ fn main() -> Result<()> {
                 .from_env_lossy(),
         )
         .finish();
+
     tracing::subscriber::set_global_default(subscriber)
         .into_diagnostic()
-        .wrap_err("setting global tracing subscriber")?;
+        .wrap_err("failed to set global tracing subscriber")?;
 
     debug!("{args:?}");
 
@@ -249,7 +251,8 @@ fn main() -> Result<()> {
 
             Ok(pass)
         })
-        .transpose()?;
+        .transpose()
+        .wrap_err("failed to load password hash")?;
 
     ensure!(
         password_hash.is_some() || insecure,
@@ -283,7 +286,7 @@ fn main() -> Result<()> {
             }
             Ok(None) => info!("No previous IP address set"),
 
-            Err(err) => error!("Failed to load last ip address: {err}"),
+            Err(err) => error!("Ignoring previous IP due to: {err}"),
         };
 
         // Create services
@@ -310,6 +313,7 @@ fn main() -> Result<()> {
         .await
         .into_diagnostic()
     })
+    .wrap_err("failed to run main loop")
 }
 
 #[tracing::instrument(skip(state), level = "trace", ret(level = "info"))]
