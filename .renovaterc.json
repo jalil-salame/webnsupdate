@@ -24,9 +24,19 @@
     "fileMatch": [
       "(^|/)flake\\.nix$"
     ],
-    "commitMessageTopic": "flake inputs",
+    "commitMessageTopic": "nixpkgs",
     "commitMessageExtra": "to {{newValue}}",
     "enabled": true
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "recreateWhen": "always",
+    "rebaseStalePrs": true,
+    "branchTopic": "lock-file-maintenance",
+    "commitMessageAction": "Lock file maintenance",
+    "schedule": [
+      "* 0-1 * * *"
+    ]
   },
   "automergeSchedule": [
     "* 0-1 * * *"
