@@ -6,7 +6,6 @@
       checks =
         let
           testDomain = "webnstest.example";
-          dynamicZonesDir = "/var/lib/named/zones";
           zoneFile = pkgs.writeText "${testDomain}.zoneinfo" ''
             $ORIGIN .
             $TTL 60 ; 1 minute
@@ -27,59 +26,65 @@
             nsupdate                  IN  AAAA  ::1
           '';
 
-          webnsupdate-machine = {
-            imports = [ self.nixosModules.webnsupdate ];
+          webnsupdate-machine =
+            { config, ... }:
+            let
+              bindCfg = config.services.bind;
+              bindData = bindCfg.directory;
+              dynamicZonesDir = "${bindData}/zones";
+            in
+            {
+              imports = [ self.nixosModules.webnsupdate ];
 
-            config = {
-              environment.systemPackages = [
-                pkgs.dig
-                pkgs.curl
-              ];
+              config = {
+                environment.systemPackages = [
+                  pkgs.dig
+                  pkgs.curl
+                ];
 
-              services = {
-                webnsupdate = {
-                  enable = true;
-                  bindIp = "127.0.0.1";
-                  keyFile = "/etc/bind/rndc.key";
-                  # test:test (user:password)
-                  passwordFile = pkgs.writeText "webnsupdate.pass" "FQoNmuU1BKfg8qsU96F6bK5ykp2b0SLe3ZpB3nbtfZA";
-                  package = self'.packages.webnsupdate;
-                  extraArgs = [
-                    "-vvv" # debug messages
-                    "--ip-source=ConnectInfo"
-                  ];
-                  records = ''
-                    test1.${testDomain}.
-                    test2.${testDomain}.
-                    test3.${testDomain}.
-                  '';
-                };
-
-                bind = {
-                  enable = true;
-                  zones.${testDomain} = {
-                    master = true;
-                    file = "${dynamicZonesDir}/${testDomain}";
-                    extraConfig = ''
-                      allow-update { key rndc-key; };
+                services = {
+                  webnsupdate = {
+                    enable = true;
+                    bindIp = "127.0.0.1";
+                    keyFile = "/etc/bind/rndc.key";
+                    # test:test (user:password)
+                    passwordFile = pkgs.writeText "webnsupdate.pass" "FQoNmuU1BKfg8qsU96F6bK5ykp2b0SLe3ZpB3nbtfZA";
+                    package = self'.packages.webnsupdate;
+                    extraArgs = [
+                      "-vvv" # debug messages
+                      "--ip-source=ConnectInfo"
+                    ];
+                    records = ''
+                      test1.${testDomain}.
+                      test2.${testDomain}.
+                      test3.${testDomain}.
                     '';
                   };
+
+                  bind = {
+                    enable = true;
+                    zones.${testDomain} = {
+                      master = true;
+                      file = "${dynamicZonesDir}/${testDomain}";
+                      extraConfig = ''
+                        allow-update { key rndc-key; };
+                      '';
+                    };
+                  };
                 };
+
+                systemd.services.bind.preStart = ''
+                  # shellcheck disable=SC2211,SC1127
+                  rm -f ${dynamicZonesDir}/* # reset dynamic zones
+
+                  mkdir -m 0755 -p ${dynamicZonesDir}
+                  chown named ${dynamicZonesDir}
+
+                  # copy dynamic zone's file to the dynamic zones dir
+                  cp ${zoneFile} ${dynamicZonesDir}/${testDomain}
+                '';
               };
-
-              systemd.services.bind.preStart = ''
-                # shellcheck disable=SC2211,SC1127
-                rm -f ${dynamicZonesDir}/* # reset dynamic zones
-
-                ${pkgs.coreutils}/bin/mkdir -m 0755 -p ${dynamicZonesDir}
-                chown "named" ${dynamicZonesDir}
-                chown "named" /var/lib/named
-
-                # copy dynamic zone's file to the dynamic zones dir
-                cp ${zoneFile} ${dynamicZonesDir}/${testDomain}
-              '';
             };
-          };
         in
         {
           module-test = pkgs.testers.runNixOSTest {
@@ -87,6 +92,7 @@
             nodes.machine = webnsupdate-machine;
             testScript = ''
               machine.start(allow_reboot=True)
+              machine.wait_for_unit("bind.service")
               machine.wait_for_unit("webnsupdate.service")
 
               # ensure base DNS records area available
