@@ -4,7 +4,7 @@
     "jalil"
   ],
   "automerge": true,
-  "automergeStrategy": "fast-forward",
+  "automergeStrategy": "auto",
   "automergeType": "pr",
   "commitBodyTable": true,
   "dependencyDashboard": true,
