@@ -256,7 +256,7 @@ mod test {
         let err = verify(
             "\
             example.com.\n\
-            name.this-is-not-aßcii.example.org.\n\
+            name.this-is-not-ascii-ß.example.org.\n\
             example.net.\n\
             subdomain.example.com.\n\
             ",

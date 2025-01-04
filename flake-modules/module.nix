@@ -138,7 +138,7 @@ let
         in
         lib.mkIf cfg.enable {
           # warnings =
-          #   lib.optional (!config.services.bind.enable) "`webnsupdate` is expected to be used alongside `bind`. This is an unsopported configuration.";
+          #   lib.optional (!config.services.bind.enable) "`webnsupdate` is expected to be used alongside `bind`. This is an unsupported configuration.";
           assertions = [
             {
               assertion =
