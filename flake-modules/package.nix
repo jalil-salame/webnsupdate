@@ -1,13 +1,11 @@
-{ withSystem, inputs, ... }:
+{ inputs, ... }:
 {
-  flake.overlays.default =
-    final: prev:
-    withSystem prev.stdenv.hostPlatform.system (
-      { self', ... }:
-      {
-        inherit (self'.packages) webnsupdate;
-      }
-    );
+  flake.overlays.default = final: prev: {
+    webnsupdate = prev.callPackage ../default.nix {
+      inherit (inputs) crane;
+      pkgSrc = inputs.self;
+    };
+  };
 
   perSystem =
     { pkgs, lib, ... }:
@@ -33,29 +31,22 @@
       };
 
       cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-      webnsupdate = craneLib.buildPackage (
-        lib.mergeAttrsList [
-          commonArgs
-          { inherit cargoArtifacts; }
-        ]
-      );
+      withArtifacts = lib.mergeAttrsList [
+        commonArgs
+        { inherit cargoArtifacts; }
+      ];
+      webnsupdate = pkgs.callPackage ../default.nix {
+        inherit (inputs) crane;
+        pkgSrc = inputs.self;
+      };
     in
     {
       checks = {
+        nextest = craneLib.cargoNextest withArtifacts;
         clippy = craneLib.cargoClippy (
           lib.mergeAttrsList [
-            commonArgs
-            {
-              inherit cargoArtifacts;
-              cargoClippyExtraArgs = "--all-targets -- --deny warnings";
-            }
-          ]
-        );
-
-        nextest = craneLib.cargoNextest (
-          lib.mergeAttrsList [
-            commonArgs
-            { inherit cargoArtifacts; }
+            withArtifacts
+            { cargoClippyExtraArgs = "--all-targets -- --deny warnings"; }
           ]
         );
       };
@@ -64,16 +55,6 @@
         inherit webnsupdate;
         inherit (pkgs) git-cliff;
         default = webnsupdate;
-        cargo-update = pkgs.writeShellApplication {
-          name = "cargo-update-lockfile";
-          runtimeInputs = with pkgs; [
-            cargo
-            gnused
-          ];
-          text = ''
-            CARGO_TERM_COLOR=never cargo update 2>&1 | sed '/crates.io index/d' | tee -a cargo_update.log
-          '';
-        };
       };
     };
 }
