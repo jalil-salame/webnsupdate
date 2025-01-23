@@ -4,15 +4,30 @@ jobs:
     runs-on: nixos
     steps:
       - uses: https://git.salame.cl/actions/checkout@v4
-      - run: nix --version
-      - run: nix build --print-build-logs .#
+      - name: Build Package
+        run: |
+          nix --version
+          nix build --print-build-logs .#
   check:
     needs: build # we use the built binaries in the checks
     runs-on: nixos
+    strategy:
+      matrix:
+        check:
+          - treefmt
+          - clippy
+          - nextest
+          - module-ipv4-test
+          - module-ipv6-test
+          - module-nginx-test
     steps:
       - uses: https://git.salame.cl/actions/checkout@v4
-      - run: nix --version
-      - run: nix flake check --keep-going --verbose --print-build-logs
+      - name: Check
+        run: |
+          set -x
+          nix --version
+          # shellcheck disable=SC2016
+          nix build --print-build-logs '.#checks.x86_64-linux.${{ matrix.check }}'
   report-size:
     runs-on: nixos
     needs: build
