@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.5] - 2025-01-23
+
+### 🚀 Features
+
+- *(renovate)* Enable lockFileMaintenance
+- *(webnsupdate)* Add handling for multiple IPs
+- Tune compilation for size
+- *(tests)* Add nginx integration test
+
+### 🐛 Bug Fixes
+
+- *(flake)* Switch to github ref
+- *(renovate)* Switch automergeStrategy to auto
+- *(ci)* Remove update workflow
+- *(typos)* Typos caught more typos :3
+- *(renovate)* Branch creation before automerge
+- *(renovaterc)* Invalid cron syntax
+- *(deps)* Update rust crate clap to v4.5.24
+- *(deps)* Update rust crate tokio to v1.43.0
+- *(deps)* Update rust crate clap to v4.5.25
+- *(deps)* Update rust crate clap to v4.5.26
+- *(flake)* Switch overlay to callPackage
+- *(deps)* Update rust crate clap to v4.5.27
+- *(deps)* Update rust crate axum to v0.8.2
+- *(module)* Test both IPv4 and IPv6
+
+### 🚜 Refactor
+
+- Setup renovate to manage dependencies
+
+### ⚙️ Miscellaneous Tasks
+
+- Update to axum 0.8
+- Parallelize checks
+
 ## [0.3.4] - 2024-12-26
 
 ### 🐛 Bug Fixes
