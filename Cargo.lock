@@ -1139,6 +1139,8 @@ dependencies = [
  "insta",
  "miette",
  "ring",
+ "serde",
+ "serde_json",
  "tokio",
  "tower-http",
  "tracing",
