@@ -48,6 +48,16 @@ let
               type = types.port;
               default = 5353;
             };
+            allowedIPVersion = mkOption {
+              description = ''The allowed IP versions to accept updates from.'';
+              type = types.enum [
+                "both"
+                "ipv4-only"
+                "ipv6-only"
+              ];
+              default = "both";
+              example = "ipv4-only";
+            };
             passwordFile = mkOption {
               description = ''
                 The file where the password is stored.
@@ -126,6 +136,8 @@ let
               cfg.passwordFile
               "--address"
               cfg.bindIp
+              "--ip-type"
+              cfg.allowedIPVersion
               "--port"
               (builtins.toString cfg.bindPort)
               "--ttl"
