@@ -81,8 +81,53 @@ struct Opts {
     #[clap(long, default_value = "RightmostXForwardedFor")]
     ip_source: SecureClientIpSource,
 
+    /// Set which IPs to allow updating
+    #[clap(long, default_value_t = IpType::Both)]
+    ip_type: IpType,
+
     #[clap(subcommand)]
     subcommand: Option<Cmd>,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+enum IpType {
+    #[default]
+    Both,
+    IPv4Only,
+    IPv6Only,
+}
+
+impl IpType {
+    fn valid_for_type(self, ip: IpAddr) -> bool {
+        match self {
+            IpType::Both => true,
+            IpType::IPv4Only => ip.is_ipv4(),
+            IpType::IPv6Only => ip.is_ipv6(),
+        }
+    }
+}
+
+impl std::fmt::Display for IpType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IpType::Both => f.write_str("both"),
+            IpType::IPv4Only => f.write_str("ipv4-only"),
+            IpType::IPv6Only => f.write_str("ipv6-only"),
+        }
+    }
+}
+
+impl std::str::FromStr for IpType {
+    type Err = miette::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "both" => Ok(Self::Both),
+            "ipv4-only" => Ok(Self::IPv4Only),
+            "ipv6-only" => Ok(Self::IPv6Only),
+            _ => bail!("expected one of 'ipv4-only', 'ipv6-only' or 'both', got '{s}'"),
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -117,6 +162,9 @@ struct AppState<'a> {
 
     /// Last recorded IPs
     last_ips: std::sync::Arc<tokio::sync::Mutex<SavedIPs>>,
+
+    /// The IP type for which to allow updates
+    ip_type: IpType,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -173,13 +221,14 @@ impl AppState<'static> {
             salt: _,
             ttl,
             ip_source: _,
+            ip_type,
         } = args;
 
         // Set state
         let ttl = Duration::from_secs(*ttl);
 
         // Use last registered IP address if available
-        let ip_file = Box::leak(data_dir.join("last-ip").into_boxed_path());
+        let ip_file = Box::leak(data_dir.join("last-ip.json").into_boxed_path());
 
         let state = AppState {
             ttl,
@@ -198,6 +247,7 @@ impl AppState<'static> {
                 })
                 .transpose()?,
             ip_file,
+            ip_type: *ip_type,
             last_ips: std::sync::Arc::new(tokio::sync::Mutex::new(
                 load_ip(ip_file)?.unwrap_or_default(),
             )),
@@ -276,6 +326,7 @@ fn main() -> Result<()> {
         salt,
         ttl: _,
         ip_source,
+        ip_type,
     } = args;
 
     info!("checking environment");
@@ -312,6 +363,10 @@ fn main() -> Result<()> {
         // Update DNS record with previous IPs (if available)
         let ips = state.last_ips.lock().await.clone();
         for ip in ips.ips() {
+            if !ip_type.valid_for_type(ip) {
+                continue;
+            }
+
             match nsupdate::nsupdate(ip, state.ttl, state.key_file, state.records).await {
                 Ok(status) => {
                     if !status.success() {
@@ -361,6 +416,13 @@ async fn update_records(
     SecureClientIp(ip): SecureClientIp,
 ) -> axum::response::Result<&'static str> {
     info!("accepted update from {ip}");
+
+    if !state.ip_type.valid_for_type(ip) {
+        let ip_type = state.ip_type;
+        tracing::warn!("rejecting update from {ip} as we are running a {ip_type} filter");
+        return Err((StatusCode::CONFLICT, format!("running in {ip_type} mode")).into());
+    }
+
     match nsupdate::nsupdate(ip, state.ttl, state.key_file, state.records).await {
         Ok(status) if status.success() => {
             let ips = {
