@@ -3,7 +3,7 @@ cargo-features = ["codegen-backend"]
 [package]
 description = "An HTTP server using HTTP basic auth to make secure calls to nsupdate"
 name = "webnsupdate"
-version = "0.3.5"
+version = "0.3.6"
 edition = "2021"
 license-file = "LICENSE"
 readme = "README.md"

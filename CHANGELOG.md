@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.6] - 2025-01-26
+
+### 🚀 Features
+
+- *(webnsupdate)* Allow running in IPv4/6 only mode
+- *(module)* Add option for setting --ip-type
+- *(flake)* Add tests for new allowedIPVersion option
+
 ## [0.3.5] - 2025-01-23
 
 ### 🚀 Features
