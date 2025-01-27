@@ -131,320 +131,160 @@
             config.services.webnsupdate.allowedIPVersion = "ipv6-only";
           };
 
-          testScript = ''
-            machine.start(allow_reboot=True)
-            machine.wait_for_unit("bind.service")
-            machine.wait_for_unit("webnsupdate.service")
+          # "A" for IPv4, "AAAA" for IPv6, "ANY" for any
+          testTemplate =
+            {
+              ipv4 ? false,
+              ipv6 ? false,
+              nginx ? false,
+              exclusive ? false,
+            }:
+            if exclusive && (ipv4 == ipv6) then
+              builtins.throw "exclusive means one of ipv4 or ipv6 must be set, but not both"
+            else
+              ''
+                IPV4: bool = ${if ipv4 then "True" else "False"}
+                IPV6: bool = ${if ipv6 then "True" else "False"}
+                NGINX: bool = ${if nginx then "True" else "False"}
+                EXCLUSIVE: bool = ${if exclusive then "True" else "False"}
+                print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
 
-            # ensure base DNS records area available
-            with subtest("query base DNS records"):
-                machine.succeed("dig @127.0.0.1 ${testDomain}          | grep ^${testDomain}")
-                machine.succeed("dig @127.0.0.1 ns1.${testDomain}      | grep ^ns1.${testDomain}")
-                machine.succeed("dig @127.0.0.1 nsupdate.${testDomain} | grep ^nsupdate.${testDomain}")
+                CURL: str = "curl --fail --no-progress-meter --show-error"
 
-            # ensure webnsupdate managed records are missing
-            with subtest("query webnsupdate DNS records (fail)"):
-                machine.fail("dig @127.0.0.1 test1.${testDomain} A test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                machine.fail("dig @127.0.0.1 test2.${testDomain} A test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                machine.fail("dig @127.0.0.1 test3.${testDomain} A test3.${testDomain} AAAA | grep ^test3.${testDomain}")
+                machine.start(allow_reboot=True)
+                machine.wait_for_unit("bind.service")
+                machine.wait_for_unit("webnsupdate.service")
 
-            with subtest("update webnsupdate DNS records (invalid auth)"):
-                machine.fail("curl --fail --silent -u test1:test1 -X GET http://localhost:5353/update")
-                machine.fail("cat ${lastIPPath}") # no last-ip set yet
+                STATIC_DOMAINS: list[str] = ["${testDomain}", "ns1.${testDomain}", "nsupdate.${testDomain}"]
+                DYNAMIC_DOMAINS: list[str] = ["test1.${testDomain}", "test2.${testDomain}", "test3.${testDomain}"]
 
-            # ensure webnsupdate managed records are missing
-            with subtest("query webnsupdate DNS records (fail)"):
-                machine.fail("dig @127.0.0.1 test1.${testDomain} A test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                machine.fail("dig @127.0.0.1 test2.${testDomain} A test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                machine.fail("dig @127.0.0.1 test3.${testDomain} A test3.${testDomain} AAAA | grep ^test3.${testDomain}")
+                def domain_available(domain: str, record: str):
+                    machine.succeed(f"dig @localhost {record} {domain} | grep ^{domain}")
 
-            with subtest("update webnsupdate DNS records (valid auth)"):
-                machine.succeed("curl --fail --silent -u test:test -X GET http://localhost:5353/update")
+                def domain_missing(domain: str, record: str):
+                    machine.fail(f"dig @localhost {record} {domain} +noall +noanswer | grep ^{domain}")
+
+                def update_records(domain: str="localhost", path: str="update"):
+                    machine.succeed(f"{CURL} -u test:test -X GET http://{domain}{"" if NGINX else ":5353"}/{path}")
+                    machine.succeed("cat ${lastIPPath}")
+
+                def update_records_fail(domain: str="localhost", identity: str="test:test", path: str="update"):
+                    machine.fail(f"{CURL} -u {identity} -X GET http://{domain}{"" if NGINX else ":5353"}/{path}")
+                    machine.fail("cat ${lastIPPath}")
+
+                def invalid_update(domain: str="localhost"):
+                    update_records_fail(domain, identity="bad_user:test")
+                    update_records_fail(domain, identity="test:bad_pass")
+
+                # Tests
+
+                with subtest("static DNS records are available"):
+                    print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
+                    for domain in STATIC_DOMAINS:
+                        domain_available(domain, "A")    # IPv4
+                        domain_available(domain, "AAAA") # IPv6
+
+                with subtest("dynamic DNS records are missing"):
+                    print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
+                    for domain in DYNAMIC_DOMAINS:
+                        domain_missing(domain, "A")    # IPv4
+                        domain_missing(domain, "AAAA") # IPv6
+
+                with subtest("invalid auth fails to update records"):
+                    print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
+                    invalid_update()
+                    for domain in DYNAMIC_DOMAINS:
+                        domain_missing(domain, "A")    # IPv4
+                        domain_missing(domain, "AAAA") # IPv6
+
+                if EXCLUSIVE:
+                    with subtest("exclusive IP version fails to update with invalid version"):
+                        print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
+                        if IPV6:
+                            update_records_fail("127.0.0.1")
+                        if IPV4:
+                            update_records_fail("[::1]")
+
+                with subtest("valid auth updates records"):
+                    print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
+                    if IPV4:
+                        update_records("127.0.0.1")
+                    if IPV6:
+                        update_records("[::1]")
+
+                    for domain in DYNAMIC_DOMAINS:
+                        if IPV4:
+                            domain_available(domain, "A")
+                        elif IPV6 and EXCLUSIVE:
+                            domain_missing(domain, "A")
+
+                        if IPV6:
+                            domain_available(domain, "AAAA")
+                        elif IPV4 and EXCLUSIVE:
+                            domain_missing(domain, "AAAA")
+
+                machine.reboot()
+                machine.succeed("cat ${lastIPPath}")
+                machine.wait_for_unit("webnsupdate.service")
                 machine.succeed("cat ${lastIPPath}")
 
-            # ensure webnsupdate managed records are available
-            with subtest("query webnsupdate DNS records (succeed)"):
-                machine.succeed("dig @127.0.0.1 test1.${testDomain} A test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                machine.succeed("dig @127.0.0.1 test2.${testDomain} A test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                machine.succeed("dig @127.0.0.1 test3.${testDomain} A test3.${testDomain} AAAA | grep ^test3.${testDomain}")
+                with subtest("static DNS records are available after reboot"):
+                    print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
+                    for domain in STATIC_DOMAINS:
+                        domain_available(domain, "A")    # IPv4
+                        domain_available(domain, "AAAA") # IPv6
 
-            machine.reboot()
-            machine.succeed("cat ${lastIPPath}")
-            machine.wait_for_unit("webnsupdate.service")
-            machine.succeed("cat ${lastIPPath}")
+                with subtest("dynamic DNS records are available after reboot"):
+                    print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
+                    for domain in DYNAMIC_DOMAINS:
+                        if IPV4:
+                            domain_available(domain, "A")
+                        elif IPV6 and EXCLUSIVE:
+                            domain_missing(domain, "A")
 
-            # ensure base DNS records area available after a reboot
-            with subtest("query base DNS records"):
-                machine.succeed("dig @127.0.0.1 ${testDomain} | grep ^${testDomain}")
-                machine.succeed("dig @127.0.0.1 ns1.${testDomain} | grep ^ns1.${testDomain}")
-                machine.succeed("dig @127.0.0.1 nsupdate.${testDomain} | grep ^nsupdate.${testDomain}")
-
-            # ensure webnsupdate managed records are available after a reboot
-            with subtest("query webnsupdate DNS records (succeed)"):
-                machine.succeed("dig @127.0.0.1 test1.${testDomain} A test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                machine.succeed("dig @127.0.0.1 test2.${testDomain} A test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                machine.succeed("dig @127.0.0.1 test3.${testDomain} A test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-          '';
+                        if IPV6:
+                            domain_available(domain, "AAAA")
+                        elif IPV4 and EXCLUSIVE:
+                            domain_missing(domain, "AAAA")
+              '';
         in
         {
-          module-ipv4-test = pkgs.testers.runNixOSTest {
+          module-ipv4-test = pkgs.testers.nixosTest {
             name = "webnsupdate-ipv4-module";
             nodes.machine = webnsupdate-ipv4-machine;
-            inherit testScript;
+            testScript = testTemplate { ipv4 = true; };
           };
-          module-ipv6-test = pkgs.testers.runNixOSTest {
+          module-ipv6-test = pkgs.testers.nixosTest {
             name = "webnsupdate-ipv6-module";
             nodes.machine = webnsupdate-ipv6-machine;
-            inherit testScript;
+            testScript = testTemplate { ipv6 = true; };
           };
-          module-nginx-test = pkgs.testers.runNixOSTest {
+          module-nginx-test = pkgs.testers.nixosTest {
             name = "webnsupdate-nginx-module";
             nodes.machine = webnsupdate-nginx-machine;
-            testScript = ''
-              machine.start(allow_reboot=True)
-              machine.wait_for_unit("bind.service")
-              machine.wait_for_unit("webnsupdate.service")
-
-              # ensure base DNS records area available
-              with subtest("query base DNS records"):
-                  machine.succeed("dig @127.0.0.1 ${testDomain}          | grep ^${testDomain}")
-                  machine.succeed("dig @127.0.0.1 ns1.${testDomain}      | grep ^ns1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 nsupdate.${testDomain} | grep ^nsupdate.${testDomain}")
-
-              # ensure webnsupdate managed records are missing
-              with subtest("query webnsupdate DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} A    | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} A    | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} A    | grep ^test3.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              with subtest("update webnsupdate DNS records (invalid auth)"):
-                  machine.fail("curl --fail --silent -u test1:test1 -X GET http://127.0.0.1/update")
-                  machine.fail("cat ${lastIPPath}") # no last-ip set yet
-
-              # ensure webnsupdate managed records are missing
-              with subtest("query webnsupdate DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} A    | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} A    | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} A    | grep ^test3.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              with subtest("update webnsupdate IPv4 DNS records (valid auth)"):
-                  machine.succeed("curl --fail --silent -u test:test -X GET http://127.0.0.1/update")
-                  machine.succeed("cat ${lastIPPath}")
-
-              # ensure webnsupdate managed IPv4 records are available
-              with subtest("query webnsupdate IPv4 DNS records (succeed)"):
-                  machine.succeed("dig @127.0.0.1 test1.${testDomain} A | grep ^test1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test2.${testDomain} A | grep ^test2.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test3.${testDomain} A | grep ^test3.${testDomain}")
-
-              # ensure webnsupdate managed IPv6 records are missing
-              with subtest("query webnsupdate IPv6 DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              with subtest("update webnsupdate IPv6 DNS records (valid auth)"):
-                  machine.succeed("curl --fail --silent -u test:test -X GET http://[::1]/update")
-                  machine.succeed("cat ${lastIPPath}")
-
-              # ensure webnsupdate managed IPv6 records are missing
-              with subtest("query webnsupdate IPv6 DNS records (fail)"):
-                  machine.succeed("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              machine.reboot()
-              machine.succeed("cat ${lastIPPath}")
-              machine.wait_for_unit("webnsupdate.service")
-              machine.succeed("cat ${lastIPPath}")
-
-              # ensure base DNS records area available after a reboot
-              with subtest("query base DNS records"):
-                  machine.succeed("dig @127.0.0.1 ${testDomain} | grep ^${testDomain}")
-                  machine.succeed("dig @127.0.0.1 ns1.${testDomain} | grep ^ns1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 nsupdate.${testDomain} | grep ^nsupdate.${testDomain}")
-
-              # ensure webnsupdate managed records are available after a reboot
-              with subtest("query webnsupdate DNS records (succeed)"):
-                  machine.succeed("dig @127.0.0.1 test1.${testDomain} A    | grep ^test1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test2.${testDomain} A    | grep ^test2.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test3.${testDomain} A    | grep ^test3.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-            '';
+            testScript = testTemplate {
+              ipv4 = true;
+              ipv6 = true;
+              nginx = true;
+            };
           };
-          module-ipv4-only-test = pkgs.testers.runNixOSTest {
+          module-ipv4-only-test = pkgs.testers.nixosTest {
             name = "webnsupdate-ipv4-only-module";
             nodes.machine = webnsupdate-ipv4-only-machine;
-            testScript = ''
-              machine.start(allow_reboot=True)
-              machine.wait_for_unit("bind.service")
-              machine.wait_for_unit("webnsupdate.service")
-
-              # ensure base DNS records area available
-              with subtest("query base DNS records"):
-                  machine.succeed("dig @127.0.0.1 ${testDomain}          | grep ^${testDomain}")
-                  machine.succeed("dig @127.0.0.1 ns1.${testDomain}      | grep ^ns1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 nsupdate.${testDomain} | grep ^nsupdate.${testDomain}")
-
-              # ensure webnsupdate managed records are missing
-              with subtest("query webnsupdate DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} A    | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} A    | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} A    | grep ^test3.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              with subtest("update webnsupdate DNS records (invalid auth)"):
-                  machine.fail("curl --fail --silent -u test1:test1 -X GET http://127.0.0.1/update")
-                  machine.fail("cat ${lastIPPath}") # no last-ip set yet
-
-              # ensure webnsupdate managed records are missing
-              with subtest("query webnsupdate DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} A    | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} A    | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} A    | grep ^test3.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              with subtest("update webnsupdate IPv6 DNS records (valid auth)"):
-                  machine.fail("curl --fail --silent -u test:test -X GET http://[::1]/update")
-                  machine.fail("cat ${lastIPPath}")
-
-              # ensure webnsupdate managed IPv6 records are missing
-              with subtest("query webnsupdate IPv6 DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              with subtest("update webnsupdate IPv4 DNS records (valid auth)"):
-                  machine.succeed("curl --fail --silent -u test:test -X GET http://127.0.0.1/update")
-                  machine.succeed("cat ${lastIPPath}")
-
-              # ensure webnsupdate managed IPv4 records are available
-              with subtest("query webnsupdate IPv4 DNS records (succeed)"):
-                  machine.succeed("dig @127.0.0.1 test1.${testDomain} A | grep ^test1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test2.${testDomain} A | grep ^test2.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test3.${testDomain} A | grep ^test3.${testDomain}")
-
-              # ensure webnsupdate managed IPv6 records are missing
-              with subtest("query webnsupdate IPv6 DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              machine.reboot()
-              machine.succeed("cat ${lastIPPath}")
-              machine.wait_for_unit("webnsupdate.service")
-              machine.succeed("cat ${lastIPPath}")
-
-              # ensure base DNS records area available after a reboot
-              with subtest("query base DNS records"):
-                  machine.succeed("dig @127.0.0.1 ${testDomain} | grep ^${testDomain}")
-                  machine.succeed("dig @127.0.0.1 ns1.${testDomain} | grep ^ns1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 nsupdate.${testDomain} | grep ^nsupdate.${testDomain}")
-
-              # ensure webnsupdate managed records are available after a reboot
-              with subtest("query webnsupdate DNS records (succeed)"):
-                  machine.succeed("dig @127.0.0.1 test1.${testDomain} A | grep ^test1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test2.${testDomain} A | grep ^test2.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test3.${testDomain} A | grep ^test3.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-            '';
+            testScript = testTemplate {
+              ipv4 = true;
+              nginx = true;
+              exclusive = true;
+            };
           };
-          module-ipv6-only-test = pkgs.testers.runNixOSTest {
+          module-ipv6-only-test = pkgs.testers.nixosTest {
             name = "webnsupdate-ipv6-only-module";
             nodes.machine = webnsupdate-ipv6-only-machine;
-            testScript = ''
-              machine.start(allow_reboot=True)
-              machine.wait_for_unit("bind.service")
-              machine.wait_for_unit("webnsupdate.service")
-
-              # ensure base DNS records area available
-              with subtest("query base DNS records"):
-                  machine.succeed("dig @127.0.0.1 ${testDomain}          | grep ^${testDomain}")
-                  machine.succeed("dig @127.0.0.1 ns1.${testDomain}      | grep ^ns1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 nsupdate.${testDomain} | grep ^nsupdate.${testDomain}")
-
-              # ensure webnsupdate managed records are missing
-              with subtest("query webnsupdate DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} A    | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} A    | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} A    | grep ^test3.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              with subtest("update webnsupdate DNS records (invalid auth)"):
-                  machine.fail("curl --fail --silent -u test1:test1 -X GET http://127.0.0.1/update")
-                  machine.fail("cat ${lastIPPath}") # no last-ip set yet
-
-              # ensure webnsupdate managed records are missing
-              with subtest("query webnsupdate DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} A    | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} A    | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} A    | grep ^test3.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              with subtest("update webnsupdate IPv4 DNS records (valid auth)"):
-                  machine.fail("curl --fail --silent -u test:test -X GET http://127.0.0.1/update")
-                  machine.fail("cat ${lastIPPath}")
-
-              # ensure webnsupdate managed IPv4 records are missing
-              with subtest("query webnsupdate IPv4 DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} A | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} A | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} A | grep ^test3.${testDomain}")
-
-              with subtest("update webnsupdate IPv6 DNS records (valid auth)"):
-                  machine.succeed("curl --fail --silent -u test:test -X GET http://[::1]/update")
-                  machine.succeed("cat ${lastIPPath}")
-
-              # ensure webnsupdate managed IPv6 records are available
-              with subtest("query webnsupdate IPv6 DNS records (succeed)"):
-                  machine.succeed("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-
-              # ensure webnsupdate managed IPv4 records are missing
-              with subtest("query webnsupdate IPv4 DNS records (fail)"):
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} A | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} A | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} A | grep ^test3.${testDomain}")
-
-              machine.reboot()
-              machine.succeed("cat ${lastIPPath}")
-              machine.wait_for_unit("webnsupdate.service")
-              machine.succeed("cat ${lastIPPath}")
-
-              # ensure base DNS records area available after a reboot
-              with subtest("query base DNS records"):
-                  machine.succeed("dig @127.0.0.1 ${testDomain} | grep ^${testDomain}")
-                  machine.succeed("dig @127.0.0.1 ns1.${testDomain} | grep ^ns1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 nsupdate.${testDomain} | grep ^nsupdate.${testDomain}")
-
-              # ensure webnsupdate managed records are available after a reboot
-              with subtest("query webnsupdate DNS records (succeed)"):
-                  machine.succeed("dig @127.0.0.1 test1.${testDomain} AAAA | grep ^test1.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test2.${testDomain} AAAA | grep ^test2.${testDomain}")
-                  machine.succeed("dig @127.0.0.1 test3.${testDomain} AAAA | grep ^test3.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test1.${testDomain} A       | grep ^test1.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test2.${testDomain} A       | grep ^test2.${testDomain}")
-                  machine.fail("dig @127.0.0.1 test3.${testDomain} A       | grep ^test3.${testDomain}")
-            '';
+            testScript = testTemplate {
+              ipv6 = true;
+              nginx = true;
+              exclusive = true;
+            };
           };
         };
     };
