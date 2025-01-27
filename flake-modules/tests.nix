@@ -158,18 +158,27 @@
                 STATIC_DOMAINS: list[str] = ["${testDomain}", "ns1.${testDomain}", "nsupdate.${testDomain}"]
                 DYNAMIC_DOMAINS: list[str] = ["test1.${testDomain}", "test2.${testDomain}", "test3.${testDomain}"]
 
-                def domain_available(domain: str, record: str):
-                    machine.succeed(f"dig @localhost {record} {domain} | grep ^{domain}")
+                def dig_cmd(domain: str, record: str, ip: str | None) -> str:
+                    match_ip = "" if ip is None else f"\\s\\+60\\s\\+IN\\s\\+{record}\\s\\+{ip}$"
+                    return f"dig @localhost {record} {domain} +noall +answer | grep '^{domain}.{match_ip}'"
 
-                def domain_missing(domain: str, record: str):
-                    machine.fail(f"dig @localhost {record} {domain} +noall +noanswer | grep ^{domain}")
+                def curl_cmd(domain: str, identity: str, path: str, query: dict[str, str]) -> str:
+                    from urllib.parse import urlencode
+                    q= f"?{urlencode(query)}" if query else ""
+                    return f"{CURL} -u {identity} -X GET 'http://{domain}{"" if NGINX else ":5353"}/{path}{q}'"
 
-                def update_records(domain: str="localhost", path: str="update"):
-                    machine.succeed(f"{CURL} -u test:test -X GET http://{domain}{"" if NGINX else ":5353"}/{path}")
+                def domain_available(domain: str, record: str, ip: str | None=None):
+                    machine.succeed(dig_cmd(domain, record, ip))
+
+                def domain_missing(domain: str, record: str, ip: str | None=None):
+                    machine.fail(dig_cmd(domain, record, ip))
+
+                def update_records(domain: str="localhost", /, *, path: str="update", **kwargs):
+                    machine.succeed(curl_cmd(domain, "test:test", path, kwargs))
                     machine.succeed("cat ${lastIPPath}")
 
-                def update_records_fail(domain: str="localhost", identity: str="test:test", path: str="update"):
-                    machine.fail(f"{CURL} -u {identity} -X GET http://{domain}{"" if NGINX else ":5353"}/{path}")
+                def update_records_fail(domain: str="localhost", /, *, identity: str="test:test", path: str="update", **kwargs):
+                    machine.fail(curl_cmd(domain, identity, path, kwargs))
                     machine.fail("cat ${lastIPPath}")
 
                 def invalid_update(domain: str="localhost"):
@@ -181,8 +190,8 @@
                 with subtest("static DNS records are available"):
                     print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
                     for domain in STATIC_DOMAINS:
-                        domain_available(domain, "A")    # IPv4
-                        domain_available(domain, "AAAA") # IPv6
+                        domain_available(domain, "A", "127.0.0.1") # IPv4
+                        domain_available(domain, "AAAA", "::1")    # IPv6
 
                 with subtest("dynamic DNS records are missing"):
                     print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
@@ -214,12 +223,50 @@
 
                     for domain in DYNAMIC_DOMAINS:
                         if IPV4:
-                            domain_available(domain, "A")
+                            domain_available(domain, "A", "127.0.0.1")
                         elif IPV6 and EXCLUSIVE:
                             domain_missing(domain, "A")
 
                         if IPV6:
-                            domain_available(domain, "AAAA")
+                            domain_available(domain, "AAAA", "::1")
+                        elif IPV4 and EXCLUSIVE:
+                            domain_missing(domain, "AAAA")
+
+                with subtest("valid auth fritzbox compatible updates records"):
+                    print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
+                    if IPV4 and IPV6:
+                        update_records("127.0.0.1", domain="test", ipv4="1.2.3.4", ipv6="::1234")
+                    elif IPV4:
+                        update_records("127.0.0.1", ipv4="1.2.3.4")
+                    elif IPV6:
+                        update_records("[::1]", ipv6="::1234")
+
+                    for domain in DYNAMIC_DOMAINS:
+                        if IPV4:
+                            domain_available(domain, "A", "1.2.3.4")
+                        elif IPV6 and EXCLUSIVE:
+                            domain_missing(domain, "A")
+
+                        if IPV6:
+                            domain_available(domain, "AAAA", "::1234")
+                        elif IPV4 and EXCLUSIVE:
+                            domain_missing(domain, "AAAA")
+
+                with subtest("valid auth replaces records"):
+                    print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
+                    if IPV4:
+                        update_records("127.0.0.1")
+                    if IPV6:
+                        update_records("[::1]")
+
+                    for domain in DYNAMIC_DOMAINS:
+                        if IPV4:
+                            domain_available(domain, "A", "127.0.0.1")
+                        elif IPV6 and EXCLUSIVE:
+                            domain_missing(domain, "A")
+
+                        if IPV6:
+                            domain_available(domain, "AAAA", "::1")
                         elif IPV4 and EXCLUSIVE:
                             domain_missing(domain, "AAAA")
 
@@ -231,19 +278,19 @@
                 with subtest("static DNS records are available after reboot"):
                     print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
                     for domain in STATIC_DOMAINS:
-                        domain_available(domain, "A")    # IPv4
-                        domain_available(domain, "AAAA") # IPv6
+                        domain_available(domain, "A", "127.0.0.1") # IPv4
+                        domain_available(domain, "AAAA", "::1")    # IPv6
 
                 with subtest("dynamic DNS records are available after reboot"):
                     print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
                     for domain in DYNAMIC_DOMAINS:
                         if IPV4:
-                            domain_available(domain, "A")
+                            domain_available(domain, "A", "127.0.0.1")
                         elif IPV6 and EXCLUSIVE:
                             domain_missing(domain, "A")
 
                         if IPV6:
-                            domain_available(domain, "AAAA")
+                            domain_available(domain, "AAAA", "::1")
                         elif IPV4 and EXCLUSIVE:
                             domain_missing(domain, "AAAA")
               '';

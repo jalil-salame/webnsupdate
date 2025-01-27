@@ -5,7 +5,11 @@ use std::{
     time::Duration,
 };
 
-use axum::{extract::State, routing::get, Router};
+use axum::{
+    extract::{Query, State},
+    routing::get,
+    Router,
+};
 use axum_client_ip::{SecureClientIp, SecureClientIpSource};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use clap::{Parser, Subcommand};
@@ -410,19 +414,115 @@ fn main() -> Result<()> {
     .wrap_err("failed to run main loop")
 }
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FritzBoxUpdateParams {
+    /// The domain that should be updated
+    #[allow(unused)]
+    #[serde(default)]
+    domain: Option<String>,
+    /// IPv4 address for the domain
+    #[serde(default)]
+    ipv4: Option<Ipv4Addr>,
+    /// IPv6 address for the domain
+    #[serde(default)]
+    ipv6: Option<Ipv6Addr>,
+    /// IPv6 prefix for the home network
+    #[allow(unused)]
+    #[serde(default)]
+    ipv6prefix: Option<String>,
+    /// Whether the networks uses both IPv4 and IPv6
+    #[allow(unused)]
+    #[serde(default)]
+    dualstack: Option<String>,
+}
+
+impl FritzBoxUpdateParams {
+    fn has_data(&self) -> bool {
+        let Self {
+            domain,
+            ipv4,
+            ipv6,
+            ipv6prefix,
+            dualstack,
+        } = self;
+        domain.is_some()
+            | ipv4.is_some()
+            | ipv6.is_some()
+            | ipv6prefix.is_some()
+            | dualstack.is_some()
+    }
+}
+
 #[tracing::instrument(skip(state), level = "trace", ret(level = "info"))]
 async fn update_records(
     State(state): State<AppState<'static>>,
     SecureClientIp(ip): SecureClientIp,
+    Query(update_params): Query<FritzBoxUpdateParams>,
 ) -> axum::response::Result<&'static str> {
     info!("accepted update from {ip}");
 
-    if !state.ip_type.valid_for_type(ip) {
-        let ip_type = state.ip_type;
-        tracing::warn!("rejecting update from {ip} as we are running a {ip_type} filter");
-        return Err((StatusCode::CONFLICT, format!("running in {ip_type} mode")).into());
+    if !update_params.has_data() {
+        if !state.ip_type.valid_for_type(ip) {
+            tracing::warn!(
+                "rejecting update from {ip} as we are running a {} filter",
+                state.ip_type
+            );
+            return Err((
+                StatusCode::CONFLICT,
+                format!("running in {} mode", state.ip_type),
+            )
+                .into());
+        }
+
+        return trigger_update(ip, &state).await;
     }
 
+    // FIXME: mark suspicious updates (where IP doesn't match the update_ip) and reject them based
+    // on policy
+
+    let FritzBoxUpdateParams {
+        domain: _,
+        ipv4,
+        ipv6,
+        ipv6prefix: _,
+        dualstack: _,
+    } = update_params;
+
+    if ipv4.is_none() && ipv6.is_none() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "failed to provide an IP for the update",
+        )
+            .into());
+    }
+
+    if let Some(ip) = ipv4 {
+        let ip = IpAddr::V4(ip);
+        if !state.ip_type.valid_for_type(ip) {
+            tracing::warn!("requested update of IPv4 but we are {}", state.ip_type);
+        }
+
+        _ = trigger_update(ip, &state).await?;
+    }
+
+    if let Some(ip) = ipv6 {
+        let ip = IpAddr::V6(ip);
+        if !state.ip_type.valid_for_type(ip) {
+            tracing::warn!("requested update of IPv6 but we are {}", state.ip_type);
+        }
+
+        _ = trigger_update(ip, &state).await?;
+    }
+
+    Ok("Successfully updated IP of records!\n")
+}
+
+#[tracing::instrument(skip(state), level = "trace", ret(level = "info"))]
+async fn trigger_update(
+    ip: IpAddr,
+    state: &AppState<'static>,
+) -> axum::response::Result<&'static str> {
     match nsupdate::nsupdate(ip, state.ttl, state.key_file, state.records).await {
         Ok(status) if status.success() => {
             let ips = {
@@ -432,16 +532,17 @@ async fn update_records(
                 ips.clone()
             };
 
+            let ip_file = state.ip_file;
             tokio::task::spawn_blocking(move || {
                 info!("updating last ips to {ips:?}");
                 let data = serde_json::to_vec(&ips).expect("invalid serialization impl");
-                if let Err(err) = std::fs::write(state.ip_file, data) {
+                if let Err(err) = std::fs::write(ip_file, data) {
                     error!("Failed to update last IP: {err}");
                 }
                 info!("updated last ips to {ips:?}");
             });
 
-            Ok("successful update")
+            Ok("Successfully updated IP of records!\n")
         }
         Ok(status) => {
             error!("nsupdate failed with code {status}");
@@ -456,5 +557,100 @@ async fn update_records(
             format!("failed to update records: {error}"),
         )
             .into()),
+    }
+}
+
+#[cfg(test)]
+mod parse_query_params {
+    use axum::extract::Query;
+
+    use super::FritzBoxUpdateParams;
+
+    #[test]
+    fn no_params() {
+        let uri = http::Uri::builder()
+            .path_and_query("/update")
+            .build()
+            .unwrap();
+        let query: Query<FritzBoxUpdateParams> = Query::try_from_uri(&uri).unwrap();
+        insta::assert_debug_snapshot!(query, @r#"
+    Query(
+        FritzBoxUpdateParams {
+            domain: None,
+            ipv4: None,
+            ipv6: None,
+            ipv6prefix: None,
+            dualstack: None,
+        },
+    )
+    "#);
+    }
+
+    #[test]
+    fn ipv4() {
+        let uri = http::Uri::builder()
+            .path_and_query("/update?ipv4=1.2.3.4")
+            .build()
+            .unwrap();
+        let query: Query<FritzBoxUpdateParams> = Query::try_from_uri(&uri).unwrap();
+        insta::assert_debug_snapshot!(query, @r#"
+    Query(
+        FritzBoxUpdateParams {
+            domain: None,
+            ipv4: Some(
+                1.2.3.4,
+            ),
+            ipv6: None,
+            ipv6prefix: None,
+            dualstack: None,
+        },
+    )
+    "#);
+    }
+
+    #[test]
+    fn ipv6() {
+        let uri = http::Uri::builder()
+            .path_and_query("/update?ipv6=%3A%3A1234")
+            .build()
+            .unwrap();
+        let query: Query<FritzBoxUpdateParams> = Query::try_from_uri(&uri).unwrap();
+        insta::assert_debug_snapshot!(query, @r#"
+    Query(
+        FritzBoxUpdateParams {
+            domain: None,
+            ipv4: None,
+            ipv6: Some(
+                ::1234,
+            ),
+            ipv6prefix: None,
+            dualstack: None,
+        },
+    )
+    "#);
+    }
+
+    #[test]
+    fn ipv4_and_ipv6() {
+        let uri = http::Uri::builder()
+            .path_and_query("/update?ipv4=1.2.3.4&ipv6=%3A%3A1234")
+            .build()
+            .unwrap();
+        let query: Query<FritzBoxUpdateParams> = Query::try_from_uri(&uri).unwrap();
+        insta::assert_debug_snapshot!(query, @r#"
+    Query(
+        FritzBoxUpdateParams {
+            domain: None,
+            ipv4: Some(
+                1.2.3.4,
+            ),
+            ipv6: Some(
+                ::1234,
+            ),
+            ipv6prefix: None,
+            dualstack: None,
+        },
+    )
+    "#);
     }
 }

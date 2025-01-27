@@ -20,6 +20,8 @@ jobs:
           - module-ipv4-test
           - module-ipv6-test
           - module-nginx-test
+          - module-ipv4-only-test
+          - module-ipv6-only-test
     steps:
       - uses: https://git.salame.cl/actions/checkout@v4
       - name: Check
