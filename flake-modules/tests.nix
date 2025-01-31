@@ -237,9 +237,9 @@
                     if IPV4 and IPV6:
                         update_records("127.0.0.1", domain="test", ipv4="1.2.3.4", ipv6="::1234")
                     elif IPV4:
-                        update_records("127.0.0.1", ipv4="1.2.3.4")
+                        update_records("127.0.0.1", ipv4="1.2.3.4", ipv6="")
                     elif IPV6:
-                        update_records("[::1]", ipv6="::1234")
+                        update_records("[::1]",     ipv4="",        ipv6="::1234")
 
                     for domain in DYNAMIC_DOMAINS:
                         if IPV4:
