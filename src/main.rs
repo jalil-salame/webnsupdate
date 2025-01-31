@@ -517,20 +517,20 @@ async fn update_records(
 
     if let Some(ip) = ipv4 {
         let ip = IpAddr::V4(ip);
-        if !state.ip_type.valid_for_type(ip) {
+        if state.ip_type.valid_for_type(ip) {
+            _ = trigger_update(ip, &state).await?;
+        } else {
             tracing::warn!("requested update of IPv4 but we are {}", state.ip_type);
         }
-
-        _ = trigger_update(ip, &state).await?;
     }
 
     if let Some(ip) = ipv6 {
         let ip = IpAddr::V6(ip);
-        if !state.ip_type.valid_for_type(ip) {
+        if state.ip_type.valid_for_type(ip) {
+            _ = trigger_update(ip, &state).await?;
+        } else {
             tracing::warn!("requested update of IPv6 but we are {}", state.ip_type);
         }
-
-        _ = trigger_update(ip, &state).await?;
     }
 
     Ok("Successfully updated IP of records!\n")
@@ -566,13 +566,13 @@ async fn trigger_update(
             error!("nsupdate failed with code {status}");
             Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "nsupdate failed, check server logs",
+                "nsupdate failed, check server logs\n",
             )
                 .into())
         }
         Err(error) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("failed to update records: {error}"),
+            format!("failed to update records: {error}\n"),
         )
             .into()),
     }
