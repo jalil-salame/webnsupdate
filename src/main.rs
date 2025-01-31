@@ -414,6 +414,24 @@ fn main() -> Result<()> {
     .wrap_err("failed to run main loop")
 }
 
+/// Serde deserialization decorator to map empty Strings to None,
+///
+/// Adapted from: <https://github.com/tokio-rs/axum/blob/main/examples/query-params-with-empty-strings/src/main.rs>
+fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    use serde::Deserialize;
+
+    let opt = Option::<std::borrow::Cow<'de, str>>::deserialize(de)?;
+    match opt.as_deref() {
+        None | Some("") => Ok(None),
+        Some(s) => s.parse::<T>().map_err(serde::de::Error::custom).map(Some),
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FritzBoxUpdateParams {
@@ -422,10 +440,10 @@ struct FritzBoxUpdateParams {
     #[serde(default)]
     domain: Option<String>,
     /// IPv4 address for the domain
-    #[serde(default)]
+    #[serde(default, deserialize_with = "empty_string_as_none")]
     ipv4: Option<Ipv4Addr>,
     /// IPv6 address for the domain
-    #[serde(default)]
+    #[serde(default, deserialize_with = "empty_string_as_none")]
     ipv6: Option<Ipv6Addr>,
     /// IPv6 prefix for the home network
     #[allow(unused)]
@@ -644,6 +662,50 @@ mod parse_query_params {
             ipv4: Some(
                 1.2.3.4,
             ),
+            ipv6: Some(
+                ::1234,
+            ),
+            ipv6prefix: None,
+            dualstack: None,
+        },
+    )
+    "#);
+    }
+
+    #[test]
+    fn ipv4_and_empty_ipv6() {
+        let uri = http::Uri::builder()
+            .path_and_query("/update?ipv4=1.2.3.4&ipv6=")
+            .build()
+            .unwrap();
+        let query: Query<FritzBoxUpdateParams> = Query::try_from_uri(&uri).unwrap();
+        insta::assert_debug_snapshot!(query, @r#"
+    Query(
+        FritzBoxUpdateParams {
+            domain: None,
+            ipv4: Some(
+                1.2.3.4,
+            ),
+            ipv6: None,
+            ipv6prefix: None,
+            dualstack: None,
+        },
+    )
+    "#);
+    }
+
+    #[test]
+    fn empty_ipv4_and_ipv6() {
+        let uri = http::Uri::builder()
+            .path_and_query("/update?ipv4=&ipv6=%3A%3A1234")
+            .build()
+            .unwrap();
+        let query: Query<FritzBoxUpdateParams> = Query::try_from_uri(&uri).unwrap();
+        insta::assert_debug_snapshot!(query, @r#"
+    Query(
+        FritzBoxUpdateParams {
+            domain: None,
+            ipv4: None,
             ipv6: Some(
                 ::1234,
             ),
