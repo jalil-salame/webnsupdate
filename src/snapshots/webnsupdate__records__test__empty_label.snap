@@ -6,11 +6,9 @@ expression: out
 ]8;;https://en.wikipedia.org/wiki/Fully_qualified_domain_name\(link)]8;;\
 
   × empty label
-   ╭─[test_records_invalid:2:6]
- 1 │ example.com.
- 2 │ name..example.org.
+   ╭────
+ 1 │ name..example.org.
    ·      ▲
    ·      ╰── label
- 3 │ example.net.
    ╰────
   help: each label should have at least one character

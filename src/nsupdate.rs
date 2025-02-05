@@ -25,7 +25,7 @@ impl<'a> Action<'a> {
         to: IpAddr,
         ttl: Duration,
         records: &'a [&'a str],
-    ) -> impl IntoIterator<Item = Self> + 'a {
+    ) -> impl IntoIterator<Item = Self> + std::iter::ExactSizeIterator + 'a {
         records
             .iter()
             .map(move |&domain| Action::Reassign { domain, to, ttl })
@@ -91,7 +91,7 @@ fn update_ns_records<'a>(
 ) -> std::io::Result<()> {
     writeln!(buf, "server 127.0.0.1")?;
     for action in actions {
-        writeln!(buf, "{action}")?;
+        write!(buf, "{action}")?;
     }
     writeln!(buf, "send")?;
     writeln!(buf, "quit")

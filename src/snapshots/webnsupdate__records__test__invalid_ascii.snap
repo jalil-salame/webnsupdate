@@ -6,11 +6,9 @@ expression: out
 ]8;;https://en.wikipedia.org/wiki/Hostname#Syntax\(link)]8;;\
 
   × invalid octet: '\xc3'
-   ╭─[test_records_invalid:2:24]
- 1 │ example.com.
- 2 │ name.this-is-not-ascii-ß.example.org.
+   ╭────
+ 1 │ name.this-is-not-ascii-ß.example.org.
    ·                        ┬
    ·                        ╰── octet
- 3 │ example.net.
    ╰────
   help: we only accept ascii characters

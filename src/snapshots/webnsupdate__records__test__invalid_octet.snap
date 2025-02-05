@@ -6,11 +6,9 @@ expression: out
 ]8;;https://en.wikipedia.org/wiki/Hostname#Syntax\(link)]8;;\
 
   × invalid octet: ':'
-   ╭─[test_records_invalid:2:20]
- 1 │ example.com.
- 2 │ name.this-character:-is-not-allowed.example.org.
+   ╭────
+ 1 │ name.this-character:-is-not-allowed.example.org.
    ·                    ┬
    ·                    ╰── octet
- 3 │ example.net.
    ╰────
   help: hostnames are only allowed to contain characters in [a-zA-Z0-9_-]

@@ -3,9 +3,17 @@
   imports = [
     inputs.treefmt-nix.flakeModule
     ./package.nix
-    ./module.nix
     ./tests.nix
   ];
+
+  flake.nixosModules =
+    let
+      webnsupdate = ../module.nix;
+    in
+    {
+      default = webnsupdate;
+      inherit webnsupdate;
+    };
 
   perSystem =
     { pkgs, ... }:

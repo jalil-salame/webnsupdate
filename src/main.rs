@@ -10,16 +10,18 @@ use axum::{
     routing::get,
     Router,
 };
-use axum_client_ip::{SecureClientIp, SecureClientIpSource};
+use axum_client_ip::SecureClientIp;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use clap::{Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
+use config::Config;
 use http::StatusCode;
 use miette::{bail, ensure, Context, IntoDiagnostic, Result};
 use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;
 
 mod auth;
+mod config;
 mod nsupdate;
 mod password;
 mod records;
@@ -32,120 +34,52 @@ struct Opts {
     #[command(flatten)]
     verbosity: Verbosity<clap_verbosity_flag::InfoLevel>,
 
-    /// Ip address of the server
-    #[arg(long, default_value = "127.0.0.1")]
-    address: IpAddr,
-
-    /// Port of the server
-    #[arg(long, default_value_t = 5353)]
-    port: u16,
-
-    /// File containing password to match against
-    ///
-    /// Should be of the format `username:password` and contain a single password
-    #[arg(long)]
-    password_file: Option<PathBuf>,
-
-    /// Salt to get more unique hashed passwords and prevent table based attacks
-    #[arg(long, default_value = DEFAULT_SALT)]
-    salt: String,
-
-    /// Time To Live (in seconds) to set on the DNS records
-    #[arg(long, default_value_t = DEFAULT_TTL.as_secs())]
-    ttl: u64,
-
     /// Data directory
-    #[arg(long, default_value = ".")]
+    #[arg(long, env, default_value = ".")]
     data_dir: PathBuf,
-
-    /// File containing the records that should be updated when an update request is made
-    ///
-    /// There should be one record per line:
-    ///
-    /// ```text
-    /// example.com.
-    /// mail.example.com.
-    /// ```
-    #[arg(long)]
-    records: PathBuf,
-
-    /// Keyfile `nsupdate` should use
-    ///
-    /// If specified, then `webnsupdate` must have read access to the file
-    #[arg(long)]
-    key_file: Option<PathBuf>,
 
     /// Allow not setting a password
     #[arg(long)]
     insecure: bool,
 
-    /// Set client IP source
-    ///
-    /// see: <https://docs.rs/axum-client-ip/latest/axum_client_ip/enum.SecureClientIpSource.html>
-    #[clap(long, default_value = "RightmostXForwardedFor")]
-    ip_source: SecureClientIpSource,
+    #[clap(flatten)]
+    config_or_command: ConfigOrCommand,
+}
 
-    /// Set which IPs to allow updating
-    #[clap(long, default_value_t = IpType::Both)]
-    ip_type: IpType,
+#[derive(clap::Args, Debug)]
+#[group(multiple = false)]
+struct ConfigOrCommand {
+    /// Path to the configuration file
+    #[arg(long, short)]
+    config: Option<PathBuf>,
 
     #[clap(subcommand)]
     subcommand: Option<Cmd>,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-enum IpType {
-    #[default]
-    Both,
-    IPv4Only,
-    IPv6Only,
-}
-
-impl IpType {
-    fn valid_for_type(self, ip: IpAddr) -> bool {
-        match self {
-            IpType::Both => true,
-            IpType::IPv4Only => ip.is_ipv4(),
-            IpType::IPv6Only => ip.is_ipv6(),
-        }
-    }
-}
-
-impl std::fmt::Display for IpType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IpType::Both => f.write_str("both"),
-            IpType::IPv4Only => f.write_str("ipv4-only"),
-            IpType::IPv6Only => f.write_str("ipv6-only"),
-        }
-    }
-}
-
-impl std::str::FromStr for IpType {
-    type Err = miette::Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "both" => Ok(Self::Both),
-            "ipv4-only" => Ok(Self::IPv4Only),
-            "ipv6-only" => Ok(Self::IPv6Only),
-            _ => bail!("expected one of 'ipv4-only', 'ipv6-only' or 'both', got '{s}'"),
-        }
+impl ConfigOrCommand {
+    pub fn take(&mut self) -> (Option<PathBuf>, Option<Cmd>) {
+        (self.config.take(), self.subcommand.take())
     }
 }
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
     Mkpasswd(password::Mkpasswd),
-    /// Verify the records file
-    Verify,
+    /// Verify the configuration file
+    Verify {
+        /// Path to the configuration file
+        config: PathBuf,
+    },
 }
 
 impl Cmd {
     pub fn process(self, args: &Opts) -> Result<()> {
         match self {
             Cmd::Mkpasswd(mkpasswd) => mkpasswd.process(args),
-            Cmd::Verify => records::load(&args.records).map(drop),
+            Cmd::Verify { config } => config::Config::load(&config) // load config
+                .and_then(Config::verified) // verify config
+                .map(drop), // ignore config data
         }
     }
 }
@@ -168,7 +102,7 @@ struct AppState<'a> {
     last_ips: std::sync::Arc<tokio::sync::Mutex<SavedIPs>>,
 
     /// The IP type for which to allow updates
-    ip_type: IpType,
+    ip_type: config::IpType,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -211,33 +145,38 @@ impl SavedIPs {
 }
 
 impl AppState<'static> {
-    fn from_args(args: &Opts) -> miette::Result<Self> {
+    fn from_args(args: &Opts, config: &config::Config) -> miette::Result<Self> {
         let Opts {
             verbosity: _,
-            address: _,
-            port: _,
-            password_file: _,
             data_dir,
-            key_file,
             insecure,
-            subcommand: _,
-            records,
-            salt: _,
-            ttl,
-            ip_source: _,
-            ip_type,
+            config_or_command: _,
         } = args;
 
-        // Set state
-        let ttl = Duration::from_secs(*ttl);
+        let config::Records {
+            ttl,
+            records,
+            client_id: _,
+            router_domain: _,
+            ip_source: _,
+            ip_type,
+            key_file,
+        } = &config.records;
 
         // Use last registered IP address if available
         let ip_file = Box::leak(data_dir.join("last-ip.json").into_boxed_path());
 
+        // Leak DNS records
+        let records: &[&str] = &*Vec::leak(
+            records
+                .iter()
+                .map(|record| &*Box::leak(record.clone()))
+                .collect(),
+        );
+
         let state = AppState {
-            ttl,
-            // Load DNS records
-            records: records::load_no_verify(records)?,
+            ttl: **ttl,
+            records,
             // Load keyfile
             key_file: key_file
                 .as_deref()
@@ -340,34 +279,37 @@ fn main() -> Result<()> {
 
     debug!("{args:?}");
 
-    // process subcommand
-    if let Some(cmd) = args.subcommand.take() {
-        return cmd.process(&args);
-    }
+    let config = match args.config_or_command.take() {
+        // process subcommand
+        (None, Some(cmd)) => return cmd.process(&args),
+        (Some(path), None) => {
+            let config = config::Config::load(&path)?;
+            if let Err(err) = config.verify() {
+                error!("failed to verify configuration: {err}");
+            }
+            config
+        }
+        (None, None) | (Some(_), Some(_)) => unreachable!(
+            "bad state, one of config or subcommand should be available (clap should enforce this)"
+        ),
+    };
 
     // Initialize state
-    let state = AppState::from_args(&args)?;
+    let state = AppState::from_args(&args, &config)?;
 
     let Opts {
         verbosity: _,
-        address: ip,
-        port,
-        password_file,
         data_dir: _,
-        key_file: _,
         insecure,
-        subcommand: _,
-        records: _,
-        salt,
-        ttl: _,
-        ip_source,
-        ip_type,
+        config_or_command: _,
     } = args;
 
     info!("checking environment");
 
     // Load password hash
-    let password_hash = password_file
+    let password_hash = config
+        .password
+        .password_file
         .map(|path| -> miette::Result<_> {
             let path = path.as_path();
             let pass = std::fs::read_to_string(path).into_diagnostic()?;
@@ -398,23 +340,26 @@ fn main() -> Result<()> {
         // Update DNS record with previous IPs (if available)
         let ips = state.last_ips.lock().await.clone();
 
-        let actions = ips
+        let mut actions = ips
             .ips()
-            .filter(|ip| ip_type.valid_for_type(*ip))
-            .flat_map(|ip| nsupdate::Action::from_records(ip, state.ttl, state.records));
+            .filter(|ip| config.records.ip_type.valid_for_type(*ip))
+            .flat_map(|ip| nsupdate::Action::from_records(ip, state.ttl, state.records))
+            .peekable();
 
-        match nsupdate::nsupdate(state.key_file, actions).await {
-            Ok(status) => {
-                if !status.success() {
-                    error!("nsupdate failed: code {status}");
-                    bail!("nsupdate returned with code {status}");
+        if actions.peek().is_some() {
+            match nsupdate::nsupdate(state.key_file, actions).await {
+                Ok(status) => {
+                    if !status.success() {
+                        error!("nsupdate failed: code {status}");
+                        bail!("nsupdate returned with code {status}");
+                    }
                 }
-            }
-            Err(err) => {
-                error!("Failed to update records with previous IP: {err}");
-                return Err(err)
-                    .into_diagnostic()
-                    .wrap_err("failed to update records with previous IP");
+                Err(err) => {
+                    error!("Failed to update records with previous IP: {err}");
+                    return Err(err)
+                        .into_diagnostic()
+                        .wrap_err("failed to update records with previous IP");
+                }
             }
         }
 
@@ -422,19 +367,24 @@ fn main() -> Result<()> {
         let app = Router::new().route("/update", get(update_records));
         // if a password is provided, validate it
         let app = if let Some(pass) = password_hash {
-            app.layer(auth::layer(Box::leak(pass), String::leak(salt)))
+            app.layer(auth::layer(
+                Box::leak(pass),
+                Box::leak(config.password.salt),
+            ))
         } else {
             app
         }
-        .layer(ip_source.into_extension())
+        .layer(config.records.ip_source.into_extension())
         .with_state(state);
 
+        let config::Server { address } = config.server;
+
         // Start services
-        info!("starting listener on {ip}:{port}");
-        let listener = tokio::net::TcpListener::bind(SocketAddr::new(ip, port))
+        info!("starting listener on {address}");
+        let listener = tokio::net::TcpListener::bind(address)
             .await
             .into_diagnostic()?;
-        info!("listening on {ip}:{port}");
+        info!("listening on {address}");
         axum::serve(
             listener,
             app.into_make_service_with_connect_info::<SocketAddr>(),
@@ -573,6 +523,15 @@ async fn trigger_update(
     state: &AppState<'static>,
 ) -> axum::response::Result<&'static str> {
     let actions = nsupdate::Action::from_records(ip, state.ttl, state.records);
+
+    if actions.len() == 0 {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Nothing to do (e.g. we are ipv4-only but an ipv6 update was requested)",
+        )
+            .into());
+    }
+
     match nsupdate::nsupdate(state.key_file, actions).await {
         Ok(status) if status.success() => {
             let ips = {
