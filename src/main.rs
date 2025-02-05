@@ -285,6 +285,37 @@ fn load_ip(path: &Path) -> Result<Option<SavedIPs>> {
         .map(Some)
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Ipv6Prefix {
+    prefix: Ipv6Addr,
+    length: u32,
+}
+
+impl std::fmt::Display for Ipv6Prefix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self { prefix, length } = self;
+        write!(f, "{prefix}/{length}")
+    }
+}
+
+impl std::str::FromStr for Ipv6Prefix {
+    type Err = miette::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let (addr, len) = s.split_once('/').wrap_err("missing `/` in ipv6 prefix")?;
+        Ok(Self {
+            prefix: addr
+                .parse()
+                .into_diagnostic()
+                .wrap_err("invalid ipv6 address for ipv6 prefix")?,
+            length: len
+                .parse()
+                .into_diagnostic()
+                .wrap_err("invalid length for ipv6 prefix")?,
+        })
+    }
+}
+
 #[tracing::instrument(err)]
 fn main() -> Result<()> {
     // set panic hook to pretty print with miette's formatter
@@ -437,7 +468,7 @@ where
 struct FritzBoxUpdateParams {
     /// The domain that should be updated
     #[allow(unused)]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "empty_string_as_none")]
     domain: Option<String>,
     /// IPv4 address for the domain
     #[serde(default, deserialize_with = "empty_string_as_none")]
@@ -447,11 +478,11 @@ struct FritzBoxUpdateParams {
     ipv6: Option<Ipv6Addr>,
     /// IPv6 prefix for the home network
     #[allow(unused)]
-    #[serde(default)]
-    ipv6prefix: Option<String>,
+    #[serde(default, deserialize_with = "empty_string_as_none")]
+    ipv6prefix: Option<Ipv6Prefix>,
     /// Whether the networks uses both IPv4 and IPv6
     #[allow(unused)]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "empty_string_as_none")]
     dualstack: Option<String>,
 }
 
