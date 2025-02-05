@@ -4,7 +4,7 @@
 //! records
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
-use std::path::Path;
+use std::path::PathBuf;
 
 use base64::prelude::*;
 use miette::{Context, IntoDiagnostic, Result};
@@ -20,11 +20,18 @@ pub struct Mkpasswd {
 
     /// The password
     password: String,
+
+    /// An application specific value
+    #[arg(long, default_value = crate::DEFAULT_SALT)]
+    salt: String,
+
+    /// The file to write the password to
+    password_file: Option<PathBuf>,
 }
 
 impl Mkpasswd {
-    pub fn process(self, args: &crate::Opts) -> Result<()> {
-        mkpasswd(self, args.password_file.as_deref(), &args.salt)
+    pub fn process(self, _args: &crate::Opts) -> Result<()> {
+        mkpasswd(self)
     }
 }
 
@@ -45,13 +52,16 @@ pub fn hash_identity(username: &str, password: &str, salt: &str) -> Digest {
 }
 
 pub fn mkpasswd(
-    Mkpasswd { username, password }: Mkpasswd,
-    password_file: Option<&Path>,
-    salt: &str,
+    Mkpasswd {
+        username,
+        password,
+        salt,
+        password_file,
+    }: Mkpasswd,
 ) -> miette::Result<()> {
-    let hash = hash_identity(&username, &password, salt);
+    let hash = hash_identity(&username, &password, &salt);
     let encoded = BASE64_URL_SAFE_NO_PAD.encode(hash.as_ref());
-    let Some(path) = password_file else {
+    let Some(path) = password_file.as_deref() else {
         println!("{encoded}");
         return Ok(());
     };

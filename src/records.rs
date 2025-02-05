@@ -1,52 +1,9 @@
 //! Deal with the DNS records
 
-use std::path::Path;
+use miette::{ensure, miette, LabeledSpan, Result};
 
-use miette::{ensure, miette, Context, IntoDiagnostic, LabeledSpan, NamedSource, Result};
-
-/// Loads and verifies the records from a file
-pub fn load(path: &Path) -> Result<()> {
-    let records = std::fs::read_to_string(path)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to read records from {}", path.display()))?;
-
-    verify(&records, path)?;
-
-    Ok(())
-}
-
-/// Load records without verifying them
-pub fn load_no_verify(path: &Path) -> Result<&'static [&'static str]> {
-    let records = std::fs::read_to_string(path)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to read records from {}", path.display()))?;
-
-    if let Err(err) = verify(&records, path) {
-        tracing::error!("Failed to verify records: {err}");
-    }
-
-    // leak memory: we only do this here and it prevents a bunch of allocations
-    let records: &str = records.leak();
-    let records: Box<[&str]> = records.lines().collect();
-
-    Ok(Box::leak(records))
-}
-
-/// Verifies that a list of records is valid
-pub fn verify(data: &str, path: &Path) -> Result<()> {
-    let mut offset = 0usize;
-    for line in data.lines() {
-        validate_line(offset, line).map_err(|err| {
-            err.with_source_code(NamedSource::new(
-                path.display().to_string(),
-                data.to_string(),
-            ))
-        })?;
-
-        offset += line.len() + 1;
-    }
-
-    Ok(())
+pub fn validate_record_str(record: &str) -> Result<()> {
+    validate_line(0, record).map_err(|err| err.with_source_code(String::from(record)))
 }
 
 fn validate_line(offset: usize, line: &str) -> Result<()> {
@@ -156,7 +113,7 @@ fn validate_octet(offset: usize, octet: u8) -> Result<()> {
 
 #[cfg(test)]
 mod test {
-    use crate::records::verify;
+    use crate::records::validate_record_str;
 
     macro_rules! assert_miette_snapshot {
         ($diag:expr) => {{
@@ -180,104 +137,51 @@ mod test {
 
     #[test]
     fn valid_records() -> miette::Result<()> {
-        verify(
-            "\
-            example.com.\n\
-            example.org.\n\
-            example.net.\n\
-            subdomain.example.com.\n\
-            ",
-            std::path::Path::new("test_records_valid"),
-        )
+        for record in [
+            "example.com.",
+            "example.org.",
+            "example.net.",
+            "subdomain.example.com.",
+        ] {
+            validate_record_str(record)?;
+        }
+        Ok(())
     }
 
     #[test]
     fn hostname_too_long() {
-        let err = verify(
-            "\
-            example.com.\n\
-            example.org.\n\
-            example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.net.\n\
-            subdomain.example.com.\n\
-            ",
-            std::path::Path::new("test_records_invalid"),
-        )
-        .unwrap_err();
+        let err = validate_record_str("example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.net.").unwrap_err();
         assert_miette_snapshot!(err);
     }
 
     #[test]
     fn not_fqd() {
-        let err = verify(
-            "\
-            example.com.\n\
-            example.org.\n\
-            example.net\n\
-            subdomain.example.com.\n\
-            ",
-            std::path::Path::new("test_records_invalid"),
-        )
-        .unwrap_err();
+        let err = validate_record_str("example.net").unwrap_err();
         assert_miette_snapshot!(err);
     }
 
     #[test]
     fn empty_label() {
-        let err = verify(
-            "\
-            example.com.\n\
-            name..example.org.\n\
-            example.net.\n\
-            subdomain.example.com.\n\
-            ",
-            std::path::Path::new("test_records_invalid"),
-        )
-        .unwrap_err();
+        let err = validate_record_str("name..example.org.").unwrap_err();
         assert_miette_snapshot!(err);
     }
 
     #[test]
     fn label_too_long() {
-        let err = verify(
-            "\
-            example.com.\n\
-            name.an-entremely-long-label-that-should-not-exist-because-it-goes-against-the-spec.example.org.\n\
-            example.net.\n\
-            subdomain.example.com.\n\
-            ",
-            std::path::Path::new("test_records_invalid"),
-        )
-        .unwrap_err();
+        let err = validate_record_str("name.an-entremely-long-label-that-should-not-exist-because-it-goes-against-the-spec.example.org.").unwrap_err();
         assert_miette_snapshot!(err);
     }
 
     #[test]
     fn invalid_ascii() {
-        let err = verify(
-            "\
-            example.com.\n\
-            name.this-is-not-ascii-ß.example.org.\n\
-            example.net.\n\
-            subdomain.example.com.\n\
-            ",
-            std::path::Path::new("test_records_invalid"),
-        )
-        .unwrap_err();
+        let err = validate_record_str("name.this-is-not-ascii-ß.example.org.").unwrap_err();
         assert_miette_snapshot!(err);
     }
 
     #[test]
     fn invalid_octet() {
-        let err = verify(
-            "\
-            example.com.\n\
-            name.this-character:-is-not-allowed.example.org.\n\
-            example.net.\n\
-            subdomain.example.com.\n\
-            ",
-            std::path::Path::new("test_records_invalid"),
-        )
-        .unwrap_err();
+        let err =
+            validate_record_str("name.this-character:-is-not-allowed.example.org.").unwrap_err();
         assert_miette_snapshot!(err);
     }
 }

@@ -6,11 +6,9 @@ expression: out
 ]8;;https://en.wikipedia.org/wiki/Fully_qualified_domain_name\(link)]8;;\
 
   × hostname too long (260 octets)
-   ╭─[test_records_invalid:3:1]
- 2 │ example.org.
- 3 │ example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.net.
+   ╭────
+ 1 │ example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.net.
    · ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    ·                                                                                                                                   ╰── this line
- 4 │ subdomain.example.com.
    ╰────
   help: fully qualified domain names can be at most 255 characters long

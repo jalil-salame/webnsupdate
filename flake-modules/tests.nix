@@ -9,7 +9,7 @@
           lastIPPath = "/var/lib/webnsupdate/last-ip.json";
 
           zoneFile = pkgs.writeText "${testDomain}.zoneinfo" ''
-            $TTL 60 ; 1 minute
+            $TTL 600 ; 10 minutes
             $ORIGIN ${testDomain}.
             @         IN SOA    ns1.${testDomain}. admin.${testDomain}. (
                           1            ; serial
@@ -73,20 +73,19 @@
 
                   webnsupdate = {
                     enable = true;
-                    bindIp = lib.mkDefault "127.0.0.1";
-                    keyFile = "/etc/bind/rndc.key";
-                    # test:test (user:password)
-                    passwordFile = pkgs.writeText "webnsupdate.pass" "FQoNmuU1BKfg8qsU96F6bK5ykp2b0SLe3ZpB3nbtfZA";
                     package = self'.packages.webnsupdate;
-                    extraArgs = [
-                      "-vvv" # debug messages
-                      "--ip-source=ConnectInfo"
-                    ];
-                    records = ''
-                      test1.${testDomain}.
-                      test2.${testDomain}.
-                      test3.${testDomain}.
-                    '';
+                    extraArgs = [ "-vvv" ]; # debug messages
+                    settings = {
+                      address = lib.mkDefault "127.0.0.1:5353";
+                      key_file = "/etc/bind/rndc.key";
+                      password_file = pkgs.writeText "webnsupdate.pass" "FQoNmuU1BKfg8qsU96F6bK5ykp2b0SLe3ZpB3nbtfZA"; # test:test
+                      ip_source = lib.mkDefault "ConnectInfo";
+                      records = [
+                        "test1.${testDomain}."
+                        "test2.${testDomain}."
+                        "test3.${testDomain}."
+                      ];
+                    };
                   };
                 };
               };
@@ -97,7 +96,7 @@
               webnsupdate-ipv4-machine
             ];
 
-            config.services.webnsupdate.bindIp = "::1";
+            config.services.webnsupdate.settings.address = "[::1]:5353";
           };
 
           webnsupdate-nginx-machine =
@@ -109,26 +108,26 @@
 
               config.services = {
                 # Use default IP Source
-                webnsupdate.extraArgs = lib.mkForce [ "-vvv" ]; # debug messages
+                webnsupdate.settings.ip_source = "RightmostXForwardedFor";
 
                 nginx = {
                   enable = true;
                   recommendedProxySettings = true;
 
                   virtualHosts.webnsupdate.locations."/".proxyPass =
-                    "http://${config.services.webnsupdate.bindIp}:${builtins.toString config.services.webnsupdate.bindPort}";
+                    "http://${config.services.webnsupdate.settings.address}";
                 };
               };
             };
 
           webnsupdate-ipv4-only-machine = {
             imports = [ webnsupdate-nginx-machine ];
-            config.services.webnsupdate.allowedIPVersion = "ipv4-only";
+            config.services.webnsupdate.settings.ip_type = "Ipv4Only";
           };
 
           webnsupdate-ipv6-only-machine = {
             imports = [ webnsupdate-nginx-machine ];
-            config.services.webnsupdate.allowedIPVersion = "ipv6-only";
+            config.services.webnsupdate.settings.ip_type = "Ipv6Only";
           };
 
           # "A" for IPv4, "AAAA" for IPv6, "ANY" for any
@@ -158,9 +157,9 @@
                 STATIC_DOMAINS: list[str] = ["${testDomain}", "ns1.${testDomain}", "nsupdate.${testDomain}"]
                 DYNAMIC_DOMAINS: list[str] = ["test1.${testDomain}", "test2.${testDomain}", "test3.${testDomain}"]
 
-                def dig_cmd(domain: str, record: str, ip: str | None) -> str:
-                    match_ip = "" if ip is None else f"\\s\\+60\\s\\+IN\\s\\+{record}\\s\\+{ip}$"
-                    return f"dig @localhost {record} {domain} +noall +answer | grep '^{domain}.{match_ip}'"
+                def dig_cmd(domain: str, record: str, ip: str | None) -> tuple[str, str]:
+                    match_ip = "" if ip is None else f"\\s\\+600\\s\\+IN\\s\\+{record}\\s\\+{ip}$"
+                    return f"dig @localhost {record} {domain} +noall +answer", f"grep '^{domain}.{match_ip}'"
 
                 def curl_cmd(domain: str, identity: str, path: str, query: dict[str, str]) -> str:
                     from urllib.parse import urlencode
@@ -168,10 +167,16 @@
                     return f"{CURL} -u {identity} -X GET 'http://{domain}{"" if NGINX else ":5353"}/{path}{q}'"
 
                 def domain_available(domain: str, record: str, ip: str | None=None):
-                    machine.succeed(dig_cmd(domain, record, ip))
+                    dig, grep = dig_cmd(domain, record, ip)
+                    rc, output = machine.execute(dig)
+                    print(f"{dig}[{rc}]: {output}")
+                    machine.succeed(f"{dig} | {grep}")
 
                 def domain_missing(domain: str, record: str, ip: str | None=None):
-                    machine.fail(dig_cmd(domain, record, ip))
+                    dig, grep = dig_cmd(domain, record, ip)
+                    rc, output = machine.execute(dig)
+                    print(f"{dig}[{rc}]: {output}")
+                    machine.fail(f"{dig} | {grep}")
 
                 def update_records(domain: str="localhost", /, *, path: str="update", **kwargs):
                     machine.succeed(curl_cmd(domain, "test:test", path, kwargs))
