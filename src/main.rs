@@ -291,6 +291,29 @@ struct Ipv6Prefix {
     length: u32,
 }
 
+impl Ipv6Prefix {
+    /// Create an [`Ipv6Addr`] from a prefix and a client id
+    pub fn with_client_id(self, client_id: Ipv6Addr) -> Ipv6Addr {
+        let Self { prefix, length } = self;
+        // Clear the last `length` bits
+        let prefix_mask = u128::MAX << length;
+        let client_mask = !prefix_mask;
+        let prefix = prefix.to_bits();
+        let client = client_id.to_bits();
+        debug_assert_eq!(
+            prefix & client_mask,
+            0,
+            "prefix contains bits in client id part"
+        );
+        debug_assert_eq!(
+            client & prefix_mask,
+            0,
+            "client id contains bits in prefix part"
+        );
+        Ipv6Addr::from_bits((prefix & prefix_mask) | (client & client_mask))
+    }
+}
+
 impl std::fmt::Display for Ipv6Prefix {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Self { prefix, length } = self;
