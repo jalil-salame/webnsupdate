@@ -9,12 +9,51 @@ use std::{
 use tokio::io::AsyncWriteExt;
 use tracing::{debug, warn};
 
-#[tracing::instrument(level = "trace", ret(level = "warn"))]
+pub enum Action<'a> {
+    // Reassign a domain to a different IP
+    Reassign {
+        domain: &'a str,
+        to: IpAddr,
+        ttl: Duration,
+    },
+}
+
+impl<'a> Action<'a> {
+    /// Create a set of [`Action`]s reassigning the domains in `records` to the specified
+    /// [`IpAddr`]
+    pub fn from_records(
+        to: IpAddr,
+        ttl: Duration,
+        records: &'a [&'a str],
+    ) -> impl IntoIterator<Item = Self> + 'a {
+        records
+            .iter()
+            .map(move |&domain| Action::Reassign { domain, to, ttl })
+    }
+}
+
+impl std::fmt::Display for Action<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Action::Reassign { domain, to, ttl } => {
+                let ttl = ttl.as_secs();
+                let typ = match to {
+                    IpAddr::V4(_) => "A",
+                    IpAddr::V6(_) => "AAAA",
+                };
+                // Delete previous record of type `typ`
+                writeln!(f, "update delete {domain} {ttl} IN {typ}")?;
+                // Add record with new IP
+                writeln!(f, "update add    {domain} {ttl} IN {typ} {to}")
+            }
+        }
+    }
+}
+
+#[tracing::instrument(level = "trace", skip(actions), ret(level = "warn"))]
 pub async fn nsupdate(
-    ip: IpAddr,
-    ttl: Duration,
     key_file: Option<&Path>,
-    records: &[&str],
+    actions: impl IntoIterator<Item = Action<'_>>,
 ) -> std::io::Result<ExitStatus> {
     let mut cmd = tokio::process::Command::new("nsupdate");
     if let Some(key_file) = key_file {
@@ -27,10 +66,13 @@ pub async fn nsupdate(
         .inspect_err(|err| warn!("failed to spawn child: {err}"))?;
     let mut stdin = child.stdin.take().expect("stdin not present");
     debug!("sending update request");
+    let mut buf = Vec::new();
+    update_ns_records(&mut buf, actions).unwrap();
     stdin
-        .write_all(update_ns_records(ip, ttl, records).as_bytes())
+        .write_all(&buf)
         .await
         .inspect_err(|err| warn!("failed to write to the stdin of nsupdate: {err}"))?;
+
     debug!("closing stdin");
     stdin
         .shutdown()
@@ -43,21 +85,16 @@ pub async fn nsupdate(
         .inspect_err(|err| warn!("failed to wait for child: {err}"))
 }
 
-fn update_ns_records(ip: IpAddr, ttl: Duration, records: &[&str]) -> String {
-    use std::fmt::Write;
-    let ttl_s: u64 = ttl.as_secs();
-
-    let rec_type = match ip {
-        IpAddr::V4(_) => "A",
-        IpAddr::V6(_) => "AAAA",
-    };
-    let mut cmds = String::from("server 127.0.0.1\n");
-    for &record in records {
-        writeln!(cmds, "update delete {record} {ttl_s} IN {rec_type}").unwrap();
-        writeln!(cmds, "update add    {record} {ttl_s} IN {rec_type} {ip}").unwrap();
+fn update_ns_records<'a>(
+    mut buf: impl std::io::Write,
+    actions: impl IntoIterator<Item = Action<'a>>,
+) -> std::io::Result<()> {
+    writeln!(buf, "server 127.0.0.1")?;
+    for action in actions {
+        writeln!(buf, "{action}")?;
     }
-    writeln!(cmds, "send\nquit").unwrap();
-    cmds
+    writeln!(buf, "send")?;
+    writeln!(buf, "quit")
 }
 
 #[cfg(test)]
@@ -66,17 +103,21 @@ mod test {
 
     use insta::assert_snapshot;
 
-    use super::update_ns_records;
+    use super::{update_ns_records, Action};
     use crate::DEFAULT_TTL;
 
     #[test]
     #[allow(non_snake_case)]
     fn expected_update_string_A() {
-        assert_snapshot!(update_ns_records(
-        IpAddr::V4(Ipv4Addr::LOCALHOST),
-        DEFAULT_TTL,
-        &["example.com.", "example.org.", "example.net."],
-    ), @r###"
+        let mut buf = Vec::new();
+        let actions = Action::from_records(
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            DEFAULT_TTL,
+            &["example.com.", "example.org.", "example.net."],
+        );
+        update_ns_records(&mut buf, actions).unwrap();
+
+        assert_snapshot!(String::from_utf8(buf).unwrap(), @r###"
         server 127.0.0.1
         update delete example.com. 60 IN A
         update add    example.com. 60 IN A 127.0.0.1
@@ -92,11 +133,15 @@ mod test {
     #[test]
     #[allow(non_snake_case)]
     fn expected_update_string_AAAA() {
-        assert_snapshot!(update_ns_records(
-        IpAddr::V6(Ipv6Addr::LOCALHOST),
-        DEFAULT_TTL,
-        &["example.com.", "example.org.", "example.net."],
-    ), @r###"
+        let mut buf = Vec::new();
+        let actions = Action::from_records(
+            IpAddr::V6(Ipv6Addr::LOCALHOST),
+            DEFAULT_TTL,
+            &["example.com.", "example.org.", "example.net."],
+        );
+        update_ns_records(&mut buf, actions).unwrap();
+
+        assert_snapshot!(String::from_utf8(buf).unwrap(), @r###"
         server 127.0.0.1
         update delete example.com. 60 IN AAAA
         update add    example.com. 60 IN AAAA ::1

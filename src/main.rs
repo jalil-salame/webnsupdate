@@ -366,24 +366,24 @@ fn main() -> Result<()> {
     rt.block_on(async {
         // Update DNS record with previous IPs (if available)
         let ips = state.last_ips.lock().await.clone();
-        for ip in ips.ips() {
-            if !ip_type.valid_for_type(ip) {
-                continue;
-            }
 
-            match nsupdate::nsupdate(ip, state.ttl, state.key_file, state.records).await {
-                Ok(status) => {
-                    if !status.success() {
-                        error!("nsupdate failed: code {status}");
-                        bail!("nsupdate returned with code {status}");
-                    }
+        let actions = ips
+            .ips()
+            .filter(|ip| ip_type.valid_for_type(*ip))
+            .flat_map(|ip| nsupdate::Action::from_records(ip, state.ttl, state.records));
+
+        match nsupdate::nsupdate(state.key_file, actions).await {
+            Ok(status) => {
+                if !status.success() {
+                    error!("nsupdate failed: code {status}");
+                    bail!("nsupdate returned with code {status}");
                 }
-                Err(err) => {
-                    error!("Failed to update records with previous IP: {err}");
-                    return Err(err)
-                        .into_diagnostic()
-                        .wrap_err("failed to update records with previous IP");
-                }
+            }
+            Err(err) => {
+                error!("Failed to update records with previous IP: {err}");
+                return Err(err)
+                    .into_diagnostic()
+                    .wrap_err("failed to update records with previous IP");
             }
         }
 
@@ -541,7 +541,8 @@ async fn trigger_update(
     ip: IpAddr,
     state: &AppState<'static>,
 ) -> axum::response::Result<&'static str> {
-    match nsupdate::nsupdate(ip, state.ttl, state.key_file, state.records).await {
+    let actions = nsupdate::Action::from_records(ip, state.ttl, state.records);
+    match nsupdate::nsupdate(state.key_file, actions).await {
         Ok(status) if status.success() => {
             let ips = {
                 // Update state

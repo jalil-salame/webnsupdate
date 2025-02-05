@@ -27,10 +27,10 @@ clap-verbosity-flag = { version = "3", default-features = false, features = [
 http = "1"
 miette = { version = "7", features = ["fancy"] }
 ring = { version = "0.17", features = ["std"] }
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.137"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt", "process", "io-util"] }
-tower-http = { version = "0.6.2", features = ["validate-request"] }
+tower-http = { version = "0.6", features = ["validate-request"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
