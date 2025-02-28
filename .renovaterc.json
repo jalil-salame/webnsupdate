@@ -35,10 +35,10 @@
     "branchTopic": "lock-file-maintenance",
     "commitMessageAction": "Lock file maintenance",
     "schedule": [
-      "* 23 * * *"
+      "* 22 * * *"
     ]
   },
   "automergeSchedule": [
-    "* 0-1 * * *"
+    "* 23 * * *"
   ]
 }
