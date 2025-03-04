@@ -37,14 +37,14 @@ impl std::fmt::Display for Action<'_> {
         match self {
             Action::Reassign { domain, to, ttl } => {
                 let ttl = ttl.as_secs();
-                let typ = match to {
+                let kind = match to {
                     IpAddr::V4(_) => "A",
                     IpAddr::V6(_) => "AAAA",
                 };
-                // Delete previous record of type `typ`
-                writeln!(f, "update delete {domain} {ttl} IN {typ}")?;
+                // Delete previous record of type `kind`
+                writeln!(f, "update delete {domain} {ttl} IN {kind}")?;
                 // Add record with new IP
-                writeln!(f, "update add    {domain} {ttl} IN {typ} {to}")
+                writeln!(f, "update add    {domain} {ttl} IN {kind} {to}")
             }
         }
     }
