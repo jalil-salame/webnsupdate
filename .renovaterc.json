@@ -9,7 +9,7 @@
   "commitBodyTable": true,
   "dependencyDashboard": true,
   "extends": [
-    "config:recommended"
+    "config:best-practices"
   ],
   "prCreation": "immediate",
   "cargo": {

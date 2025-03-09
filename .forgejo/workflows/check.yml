@@ -1,5 +1,13 @@
 on: [push]
 jobs:
+  check-renovaterc:
+    runs-on: nixos
+    steps:
+      - uses: https://git.salame.cl/actions/checkout@v4
+      - name: Validate renovaterc
+        run: |
+          nix --version
+          nix shell nixpkgs#renovate --command renovate-config-validator
   build:
     runs-on: nixos
     steps:
