@@ -16,28 +16,16 @@ jobs:
         run: |
           nix --version
           nix build --print-build-logs .#
-  check:
+  test:
     needs: build # we use the built binaries in the checks
     runs-on: nixos
-    strategy:
-      matrix:
-        check:
-          - treefmt
-          - clippy
-          - nextest
-          - module-ipv4-test
-          - module-ipv6-test
-          - module-nginx-test
-          - module-ipv4-only-test
-          - module-ipv6-only-test
     steps:
       - uses: https://git.salame.cl/actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - name: Check
+      - name: Run tests
         run: |
-          set -x
           nix --version
-          # shellcheck disable=SC2016
-          nix build --print-build-logs '.#checks.x86_64-linux.${{ matrix.check }}'
+          nix-fast-build --max-jobs 2 --no-nom --skip-cached --no-link \
+            --flake ".#checks.$(nix eval --raw --impure --expr builtins.currentSystem)"
   report-size:
     runs-on: nixos
     needs: build
