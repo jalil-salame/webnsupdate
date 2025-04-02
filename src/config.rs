@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use axum_client_ip::SecureClientIpSource;
+use axum_client_ip::ClientIpSource;
 use miette::{Context, IntoDiagnostic};
 
 #[derive(Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize)]
@@ -99,9 +99,9 @@ pub struct Records {
 
     /// Set client IP source
     ///
-    /// see: <https://docs.rs/axum-client-ip/latest/axum_client_ip/enum.SecureClientIpSource.html>
+    /// see: <https://docs.rs/axum-client-ip/latest/axum_client_ip/enum.ClientIpSource.html>
     #[serde(default = "default_ip_source")]
-    pub ip_source: SecureClientIpSource,
+    pub ip_source: ClientIpSource,
 
     /// Set which IPs to allow updating (ipv4, ipv6 or both)
     #[serde(default = "default_ip_type")]
@@ -198,8 +198,8 @@ fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 5353)
 }
 
-fn default_ip_source() -> SecureClientIpSource {
-    SecureClientIpSource::RightmostXForwardedFor
+fn default_ip_source() -> ClientIpSource {
+    ClientIpSource::RightmostXForwardedFor
 }
 
 fn default_ip_type() -> IpType {

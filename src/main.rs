@@ -10,7 +10,7 @@ use axum::{
     routing::get,
     Router,
 };
-use axum_client_ip::SecureClientIp;
+use axum_client_ip::ClientIp;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use clap::{Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
@@ -456,7 +456,7 @@ impl FritzBoxUpdateParams {
 #[tracing::instrument(skip(state), level = "trace", ret(level = "info"))]
 async fn update_records(
     State(state): State<AppState<'static>>,
-    SecureClientIp(ip): SecureClientIp,
+    ClientIp(ip): ClientIp,
     Query(update_params): Query<FritzBoxUpdateParams>,
 ) -> axum::response::Result<&'static str> {
     info!("accepted update from {ip}");
