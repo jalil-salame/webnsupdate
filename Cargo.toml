@@ -3,6 +3,7 @@ description = "An HTTP server using HTTP basic auth to make secure calls to nsup
 name = "webnsupdate"
 version = "0.3.6"
 edition = "2021"
+license = "MIT"
 license-file = "LICENSE"
 readme = "README.md"
 keywords = ["dns", "dyndns", "dynamic-ip"]
