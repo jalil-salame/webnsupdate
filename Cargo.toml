@@ -36,7 +36,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
-insta = { version = "=1.43.0", features = ["json"] }
+insta = { version = "=1.43.1", features = ["json"] }
 
 [profile.release]
 opt-level = "s"
