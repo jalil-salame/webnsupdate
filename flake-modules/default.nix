@@ -1,4 +1,8 @@
-{ inputs, ... }:
+{ lib, inputs, ... }:
+let
+  webnsupdate = ../module.nix;
+  cargoToml = lib.importTOML ../Cargo.toml;
+in
 {
   imports = [
     inputs.treefmt-nix.flakeModule
@@ -6,14 +10,10 @@
     ./tests.nix
   ];
 
-  flake.nixosModules =
-    let
-      webnsupdate = ../module.nix;
-    in
-    {
-      default = webnsupdate;
-      inherit webnsupdate;
-    };
+  flake.nixosModules = {
+    default = webnsupdate;
+    inherit webnsupdate;
+  };
 
   perSystem =
     { pkgs, ... }:
@@ -23,7 +23,10 @@
         projectRootFile = "flake.nix";
         programs = {
           nixfmt.enable = true;
-          rustfmt.enable = true;
+          rustfmt = {
+            enable = true;
+            inherit (cargoToml.package) edition; # respect the package's edition
+          };
           statix.enable = true;
           typos.enable = true;
         };
