@@ -4,7 +4,6 @@ name = "webnsupdate"
 version = "0.3.6"
 edition = "2021"
 license = "MIT"
-license-file = "LICENSE"
 readme = "README.md"
 keywords = ["dns", "dyndns", "dynamic-ip"]
 categories = ["networking", "dns", "dyndns"]
