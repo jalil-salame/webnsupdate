@@ -6,17 +6,17 @@ use std::{
 };
 
 use axum::{
+    Router,
     extract::{Query, State},
     routing::get,
-    Router,
 };
 use axum_client_ip::ClientIp;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use clap::{Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 use config::Config;
 use http::StatusCode;
-use miette::{bail, ensure, Context, IntoDiagnostic, Result};
+use miette::{Context, IntoDiagnostic, Result, bail, ensure};
 use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;
 
@@ -121,7 +121,7 @@ impl SavedIPs {
         }
     }
 
-    fn ips(&self) -> impl Iterator<Item = IpAddr> {
+    fn ips(&self) -> impl Iterator<Item = IpAddr> + use<> {
         self.ipv4
             .map(IpAddr::V4)
             .into_iter()
@@ -215,7 +215,7 @@ fn load_ip(path: &Path) -> Result<Option<SavedIPs>> {
                 _ => Err(err).into_diagnostic().wrap_err_with(|| {
                     format!("failed to load last ip address from {}", path.display())
                 }),
-            }
+            };
         }
     };
 

@@ -103,7 +103,7 @@ mod test {
 
     use insta::assert_snapshot;
 
-    use super::{update_ns_records, Action};
+    use super::{Action, update_ns_records};
     use crate::DEFAULT_TTL;
 
     #[test]
