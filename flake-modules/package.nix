@@ -1,16 +1,24 @@
 { inputs, ... }:
+let
+  inherit (inputs) crane;
+in
 {
   flake.overlays.default = final: prev: {
     webnsupdate = prev.callPackage ../default.nix {
-      inherit (inputs) crane;
+      inherit crane;
       pkgSrc = inputs.self;
     };
   };
 
   perSystem =
-    { pkgs, lib, ... }:
+    {
+      system,
+      pkgs,
+      lib,
+      ...
+    }:
     let
-      craneLib = inputs.crane.mkLib pkgs;
+      craneLib = (crane.mkLib pkgs).overrideToolchain (pkgs: pkgs.rust-bin.stable.latest.default);
       src = craneLib.cleanCargoSource inputs.self;
 
       commonArgs = {
@@ -36,11 +44,17 @@
         { inherit cargoArtifacts; }
       ];
       webnsupdate = pkgs.callPackage ../default.nix {
-        inherit (inputs) crane;
-        pkgSrc = inputs.self;
+        inherit crane;
+        pkgSrc = src;
       };
     in
     {
+      # Consume the rust-rust-overlay
+      _module.args.pkgs = import inputs.nixpkgs {
+        inherit system;
+        overlays = [ inputs.rust-overlay.overlays.default ];
+      };
+
       checks = {
         nextest = craneLib.cargoNextest withArtifacts;
         clippy = craneLib.cargoClippy (
