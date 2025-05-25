@@ -13,19 +13,9 @@
   ],
   "prCreation": "immediate",
   "cargo": {
-    "commitMessageTopic": "Rust crate {{depName}}",
-    "fileMatch": [
-      "(^|/)Cargo\\.toml$"
-    ],
-    "versioning": "cargo",
     "enabled": true
   },
   "nix": {
-    "fileMatch": [
-      "(^|/)flake\\.nix$"
-    ],
-    "commitMessageTopic": "nixpkgs",
-    "commitMessageExtra": "to {{newValue}}",
     "enabled": true
   },
   "lockFileMaintenance": {
