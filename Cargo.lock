@@ -112,9 +112,9 @@ dependencies = [
 
 [[package]]
 name = "axum-client-ip"
-version = "1.1.0"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32553d2dd2f8ab99d6d9e8a520d2ecd6eddd9194857bcd477dc56611d5d2c960"
+checksum = "36da7eace3b1521320239c3a74449c0a8d93ae6cb0730b73298b9c7b51878cf7"
 dependencies = [
  "axum",
  "client-ip",
