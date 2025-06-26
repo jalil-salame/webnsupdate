@@ -242,10 +242,7 @@ fn default_values_config_snapshot() {
     {
       "address": "127.0.0.1:5353",
       "salt": "UpdateMyDNS",
-      "ttl": {
-        "secs": 60,
-        "nanos": 0
-      },
+      "ttl": "1m",
       "ip_source": "RightmostXForwardedFor",
       "ip_type": "Both"
     }
