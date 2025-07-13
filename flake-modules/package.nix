@@ -56,6 +56,7 @@ in
 
       checks = {
         nextest = craneLib.cargoNextest withArtifacts;
+        deny = craneLib.cargoDeny commonArgs;
         clippy = craneLib.cargoClippy (
           lib.mergeAttrsList [
             withArtifacts
