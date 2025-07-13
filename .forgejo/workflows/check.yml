@@ -8,16 +8,32 @@ jobs:
       - name: Build Package
         run: |
           nix build --print-build-logs .#
-  check-integration-tests:
+  checks:
     needs: build # we use the built binaries in the checks
     runs-on: nixos
+    strategy:
+      matrix:
+        system:
+          - x86_64-linux
+        test:
+          - treefmt
+          - clippy
+          - nextest
+          - module-ipv4-only-test
+          - module-ipv4-test
+          - module-ipv6-only-test
+          - module-ipv6-test
+          - module-nginx-test
+    env:
+      TEST: ${{ matrix.test }}
+      SYSTEM: ${{ matrix.system }}
     steps:
       - uses: https://git.salame.cl/actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - run: nix --version
       - name: Run tests
         run: |
-          nix-fast-build --max-jobs 2 --no-nom --skip-cached --no-link \
-            --flake ".#checks.$(nix eval --raw --impure --expr builtins.currentSystem)"
+          nix build --print-build-logs \
+            .#checks."$SYSTEM"."$TEST"
   report-size:
     runs-on: nixos
     needs: build
