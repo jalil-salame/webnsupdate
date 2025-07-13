@@ -1,15 +1,16 @@
+let
+  inherit (builtins.getFlake (builtins.toString ./.)) inputs;
+in
 {
-  pkgs ?
-    (builtins.getFlake (builtins.toString ./.)).inputs.nixpkgs.legacyPackages.${builtins.currentSystem},
+  pkgs ? inputs.nixpkgs.legacyPackages.${builtins.currentSystem},
   lib ? pkgs.lib,
-  crane ? (builtins.getFlake (builtins.toString ./.)).inputs.crane,
-  pkgSrc ? ./.,
+  crane ? inputs.crane,
+  craneLib ? crane.mkLib pkgs,
+  cargoArtifacts ? null,
+  src ? craneLib.cleanCargoSource ./.,
   mold ? pkgs.mold,
 }:
 let
-  craneLib = crane.mkLib pkgs;
-  src = craneLib.cleanCargoSource pkgSrc;
-
   commonArgs = {
     inherit src;
     strictDeps = true;
@@ -26,12 +27,13 @@ let
       mainProgram = "webnsupdate";
     };
   };
-
-  cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 in
 craneLib.buildPackage (
   lib.mergeAttrsList [
     commonArgs
-    { inherit cargoArtifacts; }
+    {
+      cargoArtifacts =
+        if cargoArtifacts == null then craneLib.buildDepsOnly commonArgs else cargoArtifacts;
+    }
   ]
 )

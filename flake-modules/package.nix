@@ -44,8 +44,7 @@ in
         { inherit cargoArtifacts; }
       ];
       webnsupdate = pkgs.callPackage ../default.nix {
-        inherit crane;
-        pkgSrc = src;
+        inherit craneLib cargoArtifacts src;
       };
     in
     {
