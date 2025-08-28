@@ -8,6 +8,7 @@ readme = "README.md"
 keywords = ["dns", "dyndns", "dynamic-ip"]
 categories = ["networking", "dns", "dyndns"]
 repository = "https://github.com/jalil-salame/webnsupdate"
+publish = ["git-salame-cl"]
 
 [lints.clippy]
 cargo = { level = "warn", priority = -2 }

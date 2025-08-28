@@ -9,8 +9,8 @@ jobs:
         run: |
           nix build --print-build-logs .#
   checks:
-    needs: build # we use the built binaries in the checks
     runs-on: nixos
+    needs: build # we use the built binaries in the checks
     strategy:
       matrix:
         system:
@@ -35,6 +35,18 @@ jobs:
         run: |
           nix build --print-build-logs \
             .#checks."$SYSTEM"."$TEST"
+  trigger-release:
+    runs-on: nixos
+    needs: checks
+    if: forge.ref == 'refs/heads/main' # only on main
+    steps:
+      - uses: https://git.salame.cl/actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      - run: nix --version
+      - name: Create Release PR
+        env:
+          GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          nix develop --command release-plz release-pr --forge gitea
   report-size:
     runs-on: nixos
     needs: build

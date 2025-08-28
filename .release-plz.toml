@@ -1,0 +1,12 @@
+[workspace]
+allow_dirty = false             # no unstaged changes
+changelog_config = "cliff.toml" # git-cliff config
+changelog_update = true         # update the changelog
+dependencies_update = false     # renovate handles updates
+git_release_enable = true       # create a Forgejo release
+git_tag_enable = true           # generate a git tag for the release
+git_tag_name = "v{{ version }}" # git tag will be v1.2.3 instead of webnsupdate-v1.2.3
+pr_labels = ["release"]         # label as a release
+publish = true                  # publish crate to registry
+publish_timeout = "10m"         # timeout publish after 10m
+release = true                  # enable releases

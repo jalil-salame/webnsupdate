@@ -16,7 +16,7 @@ in
   };
 
   perSystem =
-    { pkgs, ... }:
+    { self', pkgs, ... }:
     {
       # Setup formatters
       treefmt = {
@@ -32,13 +32,19 @@ in
         };
       };
 
-      devShells.default = pkgs.mkShellNoCC {
-        packages = with pkgs; [
-          cargo-insta
-          cargo-udeps
-          mold
-          git-cliff
-        ];
+      devShells = {
+        default = pkgs.mkShellNoCC {
+          packages = with pkgs; [
+            cargo-insta
+            cargo-udeps
+            mold
+            git-cliff
+          ];
+        };
+        release = pkgs.mkShellNoCC {
+          inputsFrom = [ self'.packages.webnsupdate ];
+          packages = [ pkgs.release-plz ];
+        };
       };
     };
 }

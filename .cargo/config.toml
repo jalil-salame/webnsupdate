@@ -1,2 +1,5 @@
 [build]
 rustflags = ["-Clink-arg=-fuse-ld=mold"]
+
+[registries."git-salame-cl"]
+index = "sparse+https://git.salame.cl/api/packages/jalil/cargo/"
