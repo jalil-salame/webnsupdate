@@ -1,4 +1,8 @@
-on: [push]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 jobs:
   build:
     runs-on: nixos
@@ -38,16 +42,23 @@ jobs:
   trigger-release:
     runs-on: nixos
     needs: checks
-    if: forge.ref == 'refs/heads/main' # only on main
     steps:
       - uses: https://git.salame.cl/actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
       - run: nix --version
       - name: Create Release PR
         env:
           GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        if: forge.ref == 'refs/heads/main' # only on main
         run: |
           nix develop .#release \
             --command release-plz release-pr --forge gitea
+      - name: Release dry-run
+        env:
+          GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        if: forge.ref != 'refs/heads/main' # not on main
+        run: |
+          nix develop .#release \
+            --command release-plz update --forge gitea
   report-size:
     runs-on: nixos
     needs: build
