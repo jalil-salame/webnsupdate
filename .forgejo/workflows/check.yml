@@ -46,7 +46,8 @@ jobs:
         env:
           GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          nix develop --command release-plz release-pr --forge gitea
+          nix develop .#release \
+            --command release-plz release-pr --forge gitea
   report-size:
     runs-on: nixos
     needs: build
