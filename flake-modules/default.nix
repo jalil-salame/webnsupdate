@@ -30,6 +30,11 @@ in
           statix.enable = true;
           typos.enable = true;
         };
+        settings.global.excludes = [
+          # auto-generated
+          "CHANGELOG.md" # by release-plz
+          "*.snap" # by insta
+        ];
       };
 
       packages.release-script = pkgs.writeShellApplication {
