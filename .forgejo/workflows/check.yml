@@ -6,12 +6,16 @@ on:
 jobs:
   build:
     runs-on: nixos
+    outputs:
+      outPath: ${{ steps.build.outputs.outPath }}
     steps:
       - uses: https://git.salame.cl/actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
       - run: nix --version
       - name: Build Package
+        id: build
         run: |
-          nix build --print-build-logs .#
+          outPath=$(nix build --print-build-logs --print-out-paths .#)
+          echo "outPath=packages:webnsupdate:$outPath" >> "$FORGEJO_OUTPUT"
   checks:
     runs-on: nixos
     needs: build # we use the built binaries in the checks
@@ -69,3 +73,4 @@ jobs:
           generate-artifact: ${{ github.ref_name == 'main' }}
           do-comparison: true
           job-name: report-size
+          prebuilt-derivations: "${{ needs.build.outputs.outPath }}"

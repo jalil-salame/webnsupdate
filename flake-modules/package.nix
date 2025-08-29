@@ -67,7 +67,6 @@ in
 
       packages = {
         inherit webnsupdate;
-        inherit (pkgs) git-cliff;
         default = webnsupdate;
       };
     };
