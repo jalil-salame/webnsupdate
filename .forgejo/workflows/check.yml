@@ -53,7 +53,7 @@ jobs:
           RUSTC_BOOTSTRAP: 1 # v0.3.6 uses nightly cargo features
         run: |
           case "$FORGEJO_REF" in
-            refs/head/main)
+            refs/heads/main)
               nix develop .#release \
                 --command release-plz release-pr --forge gitea
               ;;
