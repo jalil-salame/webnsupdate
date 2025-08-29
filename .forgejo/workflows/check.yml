@@ -45,6 +45,7 @@ jobs:
     steps:
       - uses: https://git.salame.cl/actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
+          fetch-depth: 0 # fetch full history (needed for changelog)
           ref: ${{ forge.head_ref }} # checkout the branch instead of the pull request ref
       - run: nix --version
       - name: Create Release PR
