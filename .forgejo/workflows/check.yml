@@ -47,23 +47,15 @@ jobs:
         with:
           fetch-depth: 0 # fetch full history (needed for changelog)
           ref: ${{ forge.head_ref }} # checkout the branch instead of the pull request ref
+          token: ${{ secrets.RELEASE_TOKEN }} # use the release token so we can trigger actions
       - run: nix --version
-      - name: Create Release PR
+      - name: Create release PR
         env:
-          GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GIT_TOKEN: "${{ secrets.RELEASE_TOKEN }}" # Token to create the release
+          CARGO_REGISTRY_GIT_SALAME_CL_TOKEN: "Bearer ${{ secrets.RELEASE_TOKEN }}" # Token to publish the package
           RUSTC_BOOTSTRAP: 1 # v0.3.6 uses nightly cargo features
         run: |
-          case "$FORGEJO_REF" in
-            refs/heads/main)
-              nix develop .#release \
-                --command release-plz release-pr --forge gitea
-              ;;
-            *)
-              echo "Running release dry-run"
-              nix develop .#release \
-                --command release-plz update --forge gitea
-              ;;
-          esac
+          nix develop .#release --command release-script
   report-size:
     runs-on: nixos
     needs: build
