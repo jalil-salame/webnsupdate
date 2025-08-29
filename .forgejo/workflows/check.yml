@@ -56,7 +56,7 @@ jobs:
       - name: Create release PR
         env:
           GIT_TOKEN: "${{ secrets.RELEASE_TOKEN }}" # Token to create the release
-          CARGO_REGISTRY_GIT_SALAME_CL_TOKEN: "Bearer ${{ secrets.RELEASE_TOKEN }}" # Token to publish the package
+          CARGO_REGISTRIES_GIT_SALAME_CL_TOKEN: "Bearer ${{ secrets.RELEASE_TOKEN }}" # Token to publish the package
           RUSTC_BOOTSTRAP: 1 # v0.3.6 uses nightly cargo features
         run: |
           nix develop .#release --command release-script
