@@ -1,0 +1,49 @@
+[package]
+description = "An HTTP server using HTTP basic auth to make secure calls to nsupdate"
+name = "webnsupdate"
+readme = "README.md"
+keywords = ["dns", "dyndns", "dynamic-ip"]
+categories = ["networking", "dns", "dyndns"]
+
+edition = { workspace = true }
+include = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+version = { workspace = true }
+
+[lints.clippy]
+cargo = { level = "warn", priority = -2 }
+multiple_crate_versions = "allow"
+pedantic = { level = "warn", priority = -1 }
+
+[dependencies]
+axum-client-ip = { workspace = true }
+axum = { workspace = true }
+base64 = { workspace = true }
+clap-verbosity-flag = { workspace = true, features = ["tracing"] }
+clap = { workspace = true }
+http = { workspace = true }
+humantime = { workspace = true }
+miette = { workspace = true }
+ring = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tower-http = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+insta = { version = "1.43.1", features = ["json"] }
+
+[profile.release]
+opt-level = "s"   # reduce size for release since this isn't a high perf application
+panic = "abort"   # more size reducction
+lto = true        # even more size reducction
+strip = true      # strip debug symbols for an even smaller binary
+codegen-units = 1 # compile everything in one unit (even more size reducction)
+
+[profile.dev]
+debug = 0 # no debug info for faster link times
