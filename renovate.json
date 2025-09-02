@@ -9,7 +9,8 @@
   "commitBodyTable": true,
   "dependencyDashboard": true,
   "extends": [
-    "config:best-practices"
+    "config:best-practices",
+    ":preserveSemverRanges"
   ],
   "prCreation": "immediate",
   "cargo": {
