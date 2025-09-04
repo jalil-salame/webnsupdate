@@ -1,5 +1,7 @@
 use std::ffi::OsStr;
 use std::net::IpAddr;
+use std::net::Ipv4Addr;
+use std::net::Ipv6Addr;
 use std::path::Path;
 use std::process::ExitStatus;
 use std::process::Stdio;
@@ -8,6 +10,11 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tracing::debug;
 use tracing::warn;
+
+use crate::config::Record;
+use crate::config::Records;
+use crate::state::SavedData;
+use crate::state::SavedIps;
 
 pub enum Action<'a> {
     // Reassign a domain to a different IP
@@ -18,17 +25,105 @@ pub enum Action<'a> {
     },
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct IpPair {
+    ipv4: Option<Ipv4Addr>,
+    ipv6: Option<Ipv6Addr>,
+}
+
+impl IpPair {
+    pub fn new(ipv4: Option<Ipv4Addr>, ipv6: Option<Ipv6Addr>) -> Self {
+        Self { ipv4, ipv6 }
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.ipv4.is_none() & self.ipv6.is_none()
+    }
+
+    pub fn add_if_missing(self, ip: IpAddr) -> Self {
+        match ip {
+            IpAddr::V4(ipv4) if self.ipv4.is_none() => Self {
+                ipv4: Some(ipv4),
+                ..self
+            },
+            IpAddr::V6(ipv6) if self.ipv6.is_none() => Self {
+                ipv6: Some(ipv6),
+                ..self
+            },
+            IpAddr::V4(_) | IpAddr::V6(_) => self,
+        }
+    }
+
+    pub fn ips(self) -> impl Iterator<Item = IpAddr> {
+        self.ipv4
+            .map(IpAddr::V4)
+            .into_iter()
+            .chain(self.ipv6.map(IpAddr::V6))
+    }
+}
+
+impl From<IpAddr> for IpPair {
+    fn from(value: IpAddr) -> Self {
+        match value {
+            IpAddr::V4(ipv4_addr) => Self {
+                ipv4: Some(ipv4_addr),
+                ipv6: None,
+            },
+            IpAddr::V6(ipv6_addr) => Self {
+                ipv4: None,
+                ipv6: Some(ipv6_addr),
+            },
+        }
+    }
+}
+
+impl From<SavedIps> for IpPair {
+    fn from(SavedIps { ipv4, ipv6 }: SavedIps) -> Self {
+        IpPair { ipv4, ipv6 }
+    }
+}
+
 impl<'a> Action<'a> {
-    /// Create a set of [`Action`]s reassigning the domains in `records` to the
-    /// specified [`IpAddr`]
-    pub fn from_records(
-        to: IpAddr,
-        ttl: Duration,
-        records: &'a [&'a str],
-    ) -> impl IntoIterator<Item = Self> + std::iter::ExactSizeIterator + 'a {
+    pub fn from_saved_data<'b>(
+        saved: &'b SavedData,
+        records: &'a Records,
+    ) -> impl Iterator<Item = Self> + use<'a, 'b> {
         records
             .iter()
-            .map(move |&domain| Action::Reassign { domain, to, ttl })
+            .filter_map(|(domain, record)| {
+                Some((
+                    domain,
+                    record,
+                    saved.get(domain).cloned().map(IpPair::from)?,
+                ))
+            })
+            .flat_map(Self::from_record_tuple)
+    }
+
+    /// Create a set of [`Action`]s reassigning the domains in `records` to the
+    /// specified [`IpAddr`]
+    pub fn from_record(
+        domain: &'a str,
+        record: &'a Record,
+        ips: IpPair,
+    ) -> impl Iterator<Item = Self> {
+        std::iter::once(domain)
+            .chain(record.router_domain.as_deref())
+            .flat_map(move |domain| {
+                ips.ips()
+                    .filter(|&ip| record.ip_type.valid_for_type(ip))
+                    .map(|to| Self::Reassign {
+                        domain,
+                        to,
+                        ttl: *record.ttl,
+                    })
+            })
+    }
+
+    fn from_record_tuple(
+        (domain, record, ips): (&'a str, &'a Record, IpPair),
+    ) -> impl Iterator<Item = Self> {
+        Self::from_record(domain, record, ips)
     }
 }
 
@@ -107,16 +202,16 @@ mod test {
 
     use super::Action;
     use super::update_ns_records;
-    use crate::DEFAULT_TTL;
+    use crate::nsupdate::IpPair;
 
     #[test]
-    #[expect(non_snake_case, reason = "I can't tell that aaaa means AAAA record")]
-    fn expected_update_string_A() {
+    fn expected_update_string_ipv4() {
         let mut buf = Vec::new();
-        let actions = Action::from_records(
-            IpAddr::V4(Ipv4Addr::LOCALHOST),
-            DEFAULT_TTL,
-            &["example.com.", "example.org.", "example.net."],
+        let record = crate::config::Record::new();
+        let actions = Action::from_record(
+            "example.com.",
+            &record,
+            IpPair::from(IpAddr::V4(Ipv4Addr::LOCALHOST)),
         );
         update_ns_records(&mut buf, actions).unwrap();
 
@@ -124,23 +219,19 @@ mod test {
         server 127.0.0.1
         update delete example.com. 60 IN A
         update add    example.com. 60 IN A 127.0.0.1
-        update delete example.org. 60 IN A
-        update add    example.org. 60 IN A 127.0.0.1
-        update delete example.net. 60 IN A
-        update add    example.net. 60 IN A 127.0.0.1
         send
         quit
         "###);
     }
 
     #[test]
-    #[expect(non_snake_case, reason = "I can't tell that aaaa means AAAA record")]
-    fn expected_update_string_AAAA() {
+    fn expected_update_string_ipv6() {
         let mut buf = Vec::new();
-        let actions = Action::from_records(
-            IpAddr::V6(Ipv6Addr::LOCALHOST),
-            DEFAULT_TTL,
-            &["example.com.", "example.org.", "example.net."],
+        let record = crate::config::Record::new();
+        let actions = Action::from_record(
+            "example.com.",
+            &record,
+            IpPair::from(IpAddr::V6(Ipv6Addr::LOCALHOST)),
         );
         update_ns_records(&mut buf, actions).unwrap();
 
@@ -148,10 +239,31 @@ mod test {
         server 127.0.0.1
         update delete example.com. 60 IN AAAA
         update add    example.com. 60 IN AAAA ::1
-        update delete example.org. 60 IN AAAA
-        update add    example.org. 60 IN AAAA ::1
-        update delete example.net. 60 IN AAAA
-        update add    example.net. 60 IN AAAA ::1
+        send
+        quit
+        "###);
+    }
+
+    #[test]
+    fn expected_update_string_both() {
+        let mut buf = Vec::new();
+        let record = crate::config::Record::new();
+        let actions = Action::from_record(
+            "example.com.",
+            &record,
+            IpPair {
+                ipv4: Some(Ipv4Addr::LOCALHOST),
+                ipv6: Some(Ipv6Addr::LOCALHOST),
+            },
+        );
+        update_ns_records(&mut buf, actions).unwrap();
+
+        assert_snapshot!(String::from_utf8(buf).unwrap(), @r###"
+        server 127.0.0.1
+        update delete example.com. 60 IN A
+        update add    example.com. 60 IN A 127.0.0.1
+        update delete example.com. 60 IN AAAA
+        update add    example.com. 60 IN AAAA ::1
         send
         quit
         "###);
