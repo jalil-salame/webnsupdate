@@ -76,11 +76,13 @@
                     package = self'.packages.webnsupdate;
                     extraArgs = [ "-vvv" ]; # debug messages
                     settings = {
-                      address = lib.mkDefault "127.0.0.1:5353";
-                      key_file = "/etc/bind/rndc.key";
-                      password_file = pkgs.writeText "webnsupdate.pass" "FQoNmuU1BKfg8qsU96F6bK5ykp2b0SLe3ZpB3nbtfZA"; # test:test
-                      ip_source = lib.mkDefault "ConnectInfo";
-                      records = [
+                      server = {
+                        address = lib.mkDefault "127.0.0.1:5353";
+                        key_file = "/etc/bind/rndc.key";
+                        ip_source = lib.mkDefault "ConnectInfo";
+                      };
+                      password.file = pkgs.writeText "webnsupdate.pass" "FQoNmuU1BKfg8qsU96F6bK5ykp2b0SLe3ZpB3nbtfZA"; # test:test
+                      records.records = [
                         "test1.${testDomain}."
                         "test2.${testDomain}."
                         "test3.${testDomain}."
@@ -96,7 +98,7 @@
               webnsupdate-ipv4-machine
             ];
 
-            config.services.webnsupdate.settings.address = "[::1]:5353";
+            config.services.webnsupdate.settings.server.address = "[::1]:5353";
           };
 
           webnsupdate-nginx-machine =
@@ -108,26 +110,26 @@
 
               config.services = {
                 # Use default IP Source
-                webnsupdate.settings.ip_source = "RightmostXForwardedFor";
+                webnsupdate.settings.server.ip_source = "RightmostXForwardedFor";
 
                 nginx = {
                   enable = true;
                   recommendedProxySettings = true;
 
                   virtualHosts.webnsupdate.locations."/".proxyPass =
-                    "http://${config.services.webnsupdate.settings.address}";
+                    "http://${config.services.webnsupdate.settings.server.address}";
                 };
               };
             };
 
           webnsupdate-ipv4-only-machine = {
             imports = [ webnsupdate-nginx-machine ];
-            config.services.webnsupdate.settings.ip_type = "Ipv4Only";
+            config.services.webnsupdate.settings.records.ip_type = "Ipv4Only";
           };
 
           webnsupdate-ipv6-only-machine = {
             imports = [ webnsupdate-nginx-machine ];
-            config.services.webnsupdate.settings.ip_type = "Ipv6Only";
+            config.services.webnsupdate.settings.records.ip_type = "Ipv6Only";
           };
 
           # "A" for IPv4, "AAAA" for IPv6, "ANY" for any

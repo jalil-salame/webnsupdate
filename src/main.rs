@@ -1,5 +1,4 @@
 use std::{
-    io::ErrorKind,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::{Path, PathBuf},
     time::Duration,
@@ -25,6 +24,7 @@ mod config;
 mod nsupdate;
 mod password;
 mod records;
+mod state;
 
 const DEFAULT_TTL: Duration = Duration::from_secs(60);
 const DEFAULT_SALT: &str = "UpdateMyDNS";
@@ -77,9 +77,9 @@ impl Cmd {
     pub fn process(self, args: &Opts) -> Result<()> {
         match self {
             Cmd::Mkpasswd(mkpasswd) => mkpasswd.process(args),
-            Cmd::Verify { config } => config::Config::load(&config) // load config
-                .and_then(Config::verified) // verify config
-                .map(drop), // ignore config data
+            Cmd::Verify { config } => config::Config::load(&config)? // load config
+                .verified() // verify config
+                .map(drop),
         }
     }
 }
@@ -99,49 +99,10 @@ struct AppState<'a> {
     ip_file: &'a Path,
 
     /// Last recorded IPs
-    last_ips: std::sync::Arc<tokio::sync::Mutex<SavedIPs>>,
+    last_ips: std::sync::Arc<tokio::sync::Mutex<state::SavedIPs>>,
 
     /// The IP type for which to allow updates
     ip_type: config::IpType,
-}
-
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
-struct SavedIPs {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    ipv4: Option<Ipv4Addr>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    ipv6: Option<Ipv6Addr>,
-}
-
-impl SavedIPs {
-    fn update(&mut self, ip: IpAddr) {
-        match ip {
-            IpAddr::V4(ipv4_addr) => self.ipv4 = Some(ipv4_addr),
-            IpAddr::V6(ipv6_addr) => self.ipv6 = Some(ipv6_addr),
-        }
-    }
-
-    fn ips(&self) -> impl Iterator<Item = IpAddr> + use<> {
-        self.ipv4
-            .map(IpAddr::V4)
-            .into_iter()
-            .chain(self.ipv6.map(IpAddr::V6))
-    }
-
-    fn from_str(data: &str) -> Result<Self> {
-        match data.parse::<IpAddr>() {
-            // Old format
-            Ok(IpAddr::V4(ipv4)) => Ok(Self {
-                ipv4: Some(ipv4),
-                ipv6: None,
-            }),
-            Ok(IpAddr::V6(ipv6)) => Ok(Self {
-                ipv4: None,
-                ipv6: Some(ipv6),
-            }),
-            Err(_) => serde_json::from_str(data).into_diagnostic(),
-        }
-    }
 }
 
 impl AppState<'static> {
@@ -158,9 +119,7 @@ impl AppState<'static> {
             records,
             client_id: _,
             router_domain: _,
-            ip_source: _,
             ip_type,
-            key_file,
         } = &config.records;
 
         // Use last registered IP address if available
@@ -178,7 +137,9 @@ impl AppState<'static> {
             ttl: **ttl,
             records,
             // Load keyfile
-            key_file: key_file
+            key_file: config
+                .server
+                .key_file
                 .as_deref()
                 .map(|path| -> Result<_> {
                     std::fs::File::open(path)
@@ -192,7 +153,12 @@ impl AppState<'static> {
             ip_file,
             ip_type: *ip_type,
             last_ips: std::sync::Arc::new(tokio::sync::Mutex::new(
-                load_ip(ip_file)?.unwrap_or_default(),
+                state::SavedIPs::load(ip_file)
+                    .unwrap_or_else(|err| {
+                        error!(path = %ip_file.display(), "failed to read state file: {err}");
+                        None
+                    })
+                    .unwrap_or_default(),
             )),
         };
 
@@ -203,25 +169,6 @@ impl AppState<'static> {
 
         Ok(state)
     }
-}
-
-fn load_ip(path: &Path) -> Result<Option<SavedIPs>> {
-    debug!("loading last IP from {}", path.display());
-    let data = match std::fs::read_to_string(path) {
-        Ok(ip) => ip,
-        Err(err) => {
-            return match err.kind() {
-                ErrorKind::NotFound => Ok(None),
-                _ => Err(err).into_diagnostic().wrap_err_with(|| {
-                    format!("failed to load last ip address from {}", path.display())
-                }),
-            };
-        }
-    };
-
-    SavedIPs::from_str(&data)
-        .wrap_err_with(|| format!("failed to load last ip address from {}", path.display()))
-        .map(Some)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -289,7 +236,7 @@ fn main() -> Result<()> {
         .into_diagnostic()
         .wrap_err("failed to set global tracing subscriber")?;
 
-    debug!("{args:?}");
+    debug!("{args:#?}");
 
     let config = match args.config_or_command.take() {
         // process subcommand
@@ -306,6 +253,8 @@ fn main() -> Result<()> {
         ),
     };
 
+    debug!("{config:#?}");
+
     // Initialize state
     let state = AppState::from_args(&args, &config)?;
 
@@ -321,7 +270,7 @@ fn main() -> Result<()> {
     // Load password hash
     let password_hash = config
         .password
-        .password_file
+        .file
         .as_deref()
         .map(load_password)
         .transpose()
@@ -342,7 +291,7 @@ fn main() -> Result<()> {
         .wrap_err("failed to run main loop")
 }
 
-#[tracing::instrument(err, skip(state, pass))]
+#[tracing::instrument(err, skip(state, config, pass))]
 async fn async_main(
     state: AppState<'static>,
     config: Config,
@@ -374,6 +323,12 @@ async fn async_main(
         }
     }
 
+    let config::Server {
+        address,
+        ip_source,
+        key_file: _,
+    } = config.server;
+
     // Create services
     let app = Router::new().route("/update", get(update_records));
     // if a password is provided, validate it
@@ -385,10 +340,8 @@ async fn async_main(
     } else {
         app
     }
-    .layer(config.records.ip_source.into_extension())
+    .layer(ip_source.into_extension())
     .with_state(state);
-
-    let config::Server { address } = config.server;
 
     // Start services
     info!("starting listener on {address}");
