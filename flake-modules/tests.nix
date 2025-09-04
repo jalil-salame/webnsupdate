@@ -25,6 +25,10 @@
             @         IN  AAAA  ::1
             ns1       IN  AAAA  ::1
             nsupdate  IN  AAAA  ::1
+
+            test1     IN CNAME test.${testDomain}.
+            test2     IN CNAME test.${testDomain}.
+            test3     IN CNAME test.${testDomain}.
           '';
 
           bindDynamicZone =
@@ -76,15 +80,13 @@
                     package = self'.packages.webnsupdate;
                     extraArgs = [ "-vvv" ]; # debug messages
                     settings = {
-                      address = lib.mkDefault "127.0.0.1:5353";
-                      key_file = "/etc/bind/rndc.key";
-                      password_file = pkgs.writeText "webnsupdate.pass" "FQoNmuU1BKfg8qsU96F6bK5ykp2b0SLe3ZpB3nbtfZA"; # test:test
-                      ip_source = lib.mkDefault "ConnectInfo";
-                      records = [
-                        "test1.${testDomain}."
-                        "test2.${testDomain}."
-                        "test3.${testDomain}."
-                      ];
+                      server = {
+                        address = lib.mkDefault "127.0.0.1:5353";
+                        key_file = "/etc/bind/rndc.key";
+                        ip_source = lib.mkDefault "ConnectInfo";
+                      };
+                      password.file = pkgs.writeText "webnsupdate.pass" "FQoNmuU1BKfg8qsU96F6bK5ykp2b0SLe3ZpB3nbtfZA"; # test:test
+                      records."test.${testDomain}." = { };
                     };
                   };
                 };
@@ -96,7 +98,7 @@
               webnsupdate-ipv4-machine
             ];
 
-            config.services.webnsupdate.settings.address = "[::1]:5353";
+            config.services.webnsupdate.settings.server.address = "[::1]:5353";
           };
 
           webnsupdate-nginx-machine =
@@ -108,26 +110,26 @@
 
               config.services = {
                 # Use default IP Source
-                webnsupdate.settings.ip_source = "RightmostXForwardedFor";
+                webnsupdate.settings.server.ip_source = "RightmostXForwardedFor";
 
                 nginx = {
                   enable = true;
                   recommendedProxySettings = true;
 
                   virtualHosts.webnsupdate.locations."/".proxyPass =
-                    "http://${config.services.webnsupdate.settings.address}";
+                    "http://${config.services.webnsupdate.settings.server.address}";
                 };
               };
             };
 
           webnsupdate-ipv4-only-machine = {
             imports = [ webnsupdate-nginx-machine ];
-            config.services.webnsupdate.settings.ip_type = "Ipv4Only";
+            config.services.webnsupdate.settings.records."test.${testDomain}.".ip_type = "Ipv4Only";
           };
 
           webnsupdate-ipv6-only-machine = {
             imports = [ webnsupdate-nginx-machine ];
-            config.services.webnsupdate.settings.ip_type = "Ipv6Only";
+            config.services.webnsupdate.settings.records."test.${testDomain}.".ip_type = "Ipv6Only";
           };
 
           # "A" for IPv4, "AAAA" for IPv6, "ANY" for any
@@ -155,10 +157,10 @@
                 machine.wait_for_unit("webnsupdate.service")
 
                 STATIC_DOMAINS: list[str] = ["${testDomain}", "ns1.${testDomain}", "nsupdate.${testDomain}"]
-                DYNAMIC_DOMAINS: list[str] = ["test1.${testDomain}", "test2.${testDomain}", "test3.${testDomain}"]
+                DYNAMIC_DOMAINS: list[str] = ["test.${testDomain}"]
 
                 def dig_cmd(domain: str, record: str, ip: str | None) -> tuple[str, str]:
-                    match_ip = "" if ip is None else f"\\s\\+600\\s\\+IN\\s\\+{record}\\s\\+{ip}$"
+                    match_ip = ".*IN\\s\\+{record}" if ip is None else f"\\s\\+600\\s\\+IN\\s\\+{record}\\s\\+{ip}$"
                     return f"dig @localhost {record} {domain} +noall +answer", f"grep '^{domain}.{match_ip}'"
 
                 def curl_cmd(domain: str, identity: str, path: str, query: dict[str, str]) -> str:
@@ -240,7 +242,7 @@
                 with subtest("valid auth fritzbox compatible updates records"):
                     print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
                     if IPV4 and IPV6:
-                        update_records("127.0.0.1", domain="test", ipv4="1.2.3.4", ipv6="::1234")
+                        update_records("127.0.0.1", domain="test.${testDomain}", ipv4="1.2.3.4", ipv6="::1234")
                     elif IPV4:
                         update_records("127.0.0.1", ipv4="1.2.3.4", ipv6="")
                     elif IPV6:

@@ -32,7 +32,7 @@ pub struct Mkpasswd {
 }
 
 impl Mkpasswd {
-    pub fn process(self, _args: &crate::Opts) -> Result<()> {
+    pub fn process(self, _args: &crate::cli::Opts) -> Result<()> {
         mkpasswd(self)
     }
 }
