@@ -126,7 +126,8 @@ pub struct Server {
 pub struct Password {
     /// File containing password to match against
     ///
-    /// Should be of the format `username:password` and contain a single password
+    /// Should be of the format `username:password` and contain a single
+    /// password
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub password_file: Option<PathBuf>,
 
@@ -176,13 +177,14 @@ pub struct Records {
     #[serde(default = "default_ttl", with = "serde_humantime")]
     pub ttl: humantime::Duration,
 
-    /// List of domain names for which to update the IP when an update is requested
+    /// List of domain names for which to update the IP when an update is
+    /// requested
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[allow(clippy::struct_field_names)]
     pub records: Vec<Box<str>>,
 
-    /// If provided, when an IPv6 prefix is provided with an update, this will be used to derive
-    /// the full IPv6 address of the client
+    /// If provided, when an IPv6 prefix is provided with an update, this will
+    /// be used to derive the full IPv6 address of the client
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         not(test),
@@ -190,9 +192,10 @@ pub struct Records {
     )]
     pub client_id: Option<Ipv6Addr>,
 
-    /// If a client id is provided the ipv6 update will be ignored (only the prefix will be used).
-    /// This domain will point to the ipv6 address instead of the address derived from the client
-    /// id (usually this is the router).
+    /// If a client id is provided the ipv6 update will be ignored (only the
+    /// prefix will be used). This domain will point to the ipv6 address
+    /// instead of the address derived from the client id (usually this is
+    /// the router).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub router_domain: Option<Box<str>>,
 
@@ -220,7 +223,8 @@ pub struct Invalid {
     pub invalid_records: Vec<miette::Error>,
 }
 
-// --- Default Values (sadly serde doesn't have a way to specify a constant as a default value) ---
+// --- Default Values (sadly serde doesn't have a way to specify a constant as a
+// default value) ---
 
 fn default_ttl() -> humantime::Duration {
     super::DEFAULT_TTL.into()

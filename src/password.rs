@@ -1,7 +1,7 @@
 //! Make a password for use with webnsupdate
 //!
-//! You should call this command an give it's output to the app/script that will update the DNS
-//! records
+//! You should call this command an give it's output to the app/script that will
+//! update the DNS records
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;

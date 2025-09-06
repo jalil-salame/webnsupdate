@@ -19,8 +19,8 @@ pub enum Action<'a> {
 }
 
 impl<'a> Action<'a> {
-    /// Create a set of [`Action`]s reassigning the domains in `records` to the specified
-    /// [`IpAddr`]
+    /// Create a set of [`Action`]s reassigning the domains in `records` to the
+    /// specified [`IpAddr`]
     pub fn from_records(
         to: IpAddr,
         ttl: Duration,

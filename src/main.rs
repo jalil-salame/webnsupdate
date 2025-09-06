@@ -486,8 +486,8 @@ async fn update_records(
         return trigger_update(ip, &state).await;
     }
 
-    // FIXME: mark suspicious updates (where IP doesn't match the update_ip) and reject them based
-    // on policy
+    // FIXME: mark suspicious updates (where IP doesn't match the update_ip) and
+    // reject them based on policy
 
     let FritzBoxUpdateParams {
         domain: _,
