@@ -150,7 +150,13 @@ mod test {
 
     #[test]
     fn hostname_too_long() {
-        let err = validate_record_str("example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.example.net.").unwrap_err();
+        let err = validate_record_str(
+            "example.example.example.example.example.example.example.example.example.example.\
+             example.example.example.example.example.example.example.example.example.example.\
+             example.example.example.example.example.example.example.example.example.example.\
+             example.example.net.",
+        )
+        .unwrap_err();
         assert_miette_snapshot!(err);
     }
 
@@ -168,7 +174,11 @@ mod test {
 
     #[test]
     fn label_too_long() {
-        let err = validate_record_str("name.an-entremely-long-label-that-should-not-exist-because-it-goes-against-the-spec.example.org.").unwrap_err();
+        let err = validate_record_str(
+            "name.an-entremely-long-label-that-should-not-exist-because-it-goes-against-the-spec.\
+             example.org.",
+        )
+        .unwrap_err();
         assert_miette_snapshot!(err);
     }
 
