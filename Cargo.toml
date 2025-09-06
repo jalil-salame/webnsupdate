@@ -14,7 +14,9 @@ publish = ["git-salame-cl"]
 allow_attributes = "warn"
 allow_attributes_without_reason = "deny"
 cargo = { level = "warn", priority = -2 }
+filetype_is_file = "warn"
 multiple_crate_versions = "allow"
+panic_in_result_fn = "warn"
 pedantic = { level = "warn", priority = -1 }
 uninlined_format_args = "warn"
 unwrap_in_result = "warn"
