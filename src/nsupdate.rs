@@ -110,7 +110,7 @@ mod test {
     use crate::DEFAULT_TTL;
 
     #[test]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case, reason = "I can't tell that aaaa means AAAA record")]
     fn expected_update_string_A() {
         let mut buf = Vec::new();
         let actions = Action::from_records(
@@ -134,7 +134,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case, reason = "I can't tell that aaaa means AAAA record")]
     fn expected_update_string_AAAA() {
         let mut buf = Vec::new();
         let actions = Action::from_records(

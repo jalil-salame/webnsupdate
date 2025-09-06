@@ -98,8 +98,10 @@ where
 
         let mut res = http::Response::new(ResBody::default());
         *res.status_mut() = http::status::StatusCode::UNAUTHORIZED;
-        res.headers_mut()
-            .insert(http::header::WWW_AUTHENTICATE, "Basic".parse().unwrap());
+        res.headers_mut().insert(
+            http::header::WWW_AUTHENTICATE,
+            http::HeaderValue::from_static("Basic"),
+        );
         Err(res)
     }
 }

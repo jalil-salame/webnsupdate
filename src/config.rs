@@ -182,7 +182,7 @@ pub struct Records {
     /// List of domain names for which to update the IP when an update is
     /// requested
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names, reason = "what else should I name this?")]
     pub records: Vec<Box<str>>,
 
     /// If provided, when an IPv6 prefix is provided with an update, this will

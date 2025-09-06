@@ -435,7 +435,6 @@ where
 #[serde(deny_unknown_fields)]
 struct FritzBoxUpdateParams {
     /// The domain that should be updated
-    #[allow(unused)]
     #[serde(default, deserialize_with = "empty_string_as_none")]
     domain: Option<String>,
     /// IPv4 address for the domain
@@ -445,11 +444,9 @@ struct FritzBoxUpdateParams {
     #[serde(default, deserialize_with = "empty_string_as_none")]
     ipv6: Option<Ipv6Addr>,
     /// IPv6 prefix for the home network
-    #[allow(unused)]
     #[serde(default, deserialize_with = "empty_string_as_none")]
     ipv6prefix: Option<Ipv6Prefix>,
     /// Whether the networks uses both IPv4 and IPv6
-    #[allow(unused)]
     #[serde(default, deserialize_with = "empty_string_as_none")]
     dualstack: Option<String>,
 }
