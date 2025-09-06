@@ -1,3 +1,8 @@
+use axum::http::HeaderValue;
+use axum::http::Request;
+use axum::http::Response;
+use axum::http::header;
+use axum::http::status::StatusCode;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use tower_http::validate_request::ValidateRequestHeaderLayer;
@@ -49,8 +54,8 @@ impl<'a, ResBody> Basic<'a, ResBody> {
         }
     }
 
-    fn check_headers(&self, headers: &http::HeaderMap<http::HeaderValue>) -> bool {
-        let Some(auth) = headers.get(http::header::AUTHORIZATION) else {
+    fn check_headers(&self, headers: &axum::http::HeaderMap<HeaderValue>) -> bool {
+        let Some(auth) = headers.get(header::AUTHORIZATION) else {
             return false;
         };
 
@@ -88,20 +93,15 @@ where
 {
     type ResponseBody = ResBody;
 
-    fn validate(
-        &mut self,
-        request: &mut http::Request<B>,
-    ) -> std::result::Result<(), http::Response<Self::ResponseBody>> {
+    fn validate(&mut self, request: &mut Request<B>) -> Result<(), Response<Self::ResponseBody>> {
         if self.check_headers(request.headers()) {
             return Ok(());
         }
 
-        let mut res = http::Response::new(ResBody::default());
-        *res.status_mut() = http::status::StatusCode::UNAUTHORIZED;
-        res.headers_mut().insert(
-            http::header::WWW_AUTHENTICATE,
-            http::HeaderValue::from_static("Basic"),
-        );
+        let mut res = Response::new(ResBody::default());
+        *res.status_mut() = StatusCode::UNAUTHORIZED;
+        res.headers_mut()
+            .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Basic"));
         Err(res)
     }
 }

@@ -10,6 +10,7 @@ use std::time::Duration;
 use axum::Router;
 use axum::extract::Query;
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::routing::get;
 use axum_client_ip::ClientIp;
 use base64::Engine;
@@ -18,7 +19,6 @@ use clap::Parser;
 use clap::Subcommand;
 use clap_verbosity_flag::Verbosity;
 use config::Config;
-use http::StatusCode;
 use miette::Context;
 use miette::IntoDiagnostic;
 use miette::Result;
@@ -587,15 +587,13 @@ async fn trigger_update(
 #[cfg(test)]
 mod parse_query_params {
     use axum::extract::Query;
+    use axum::http::Uri;
 
     use super::FritzBoxUpdateParams;
 
     #[test]
     fn no_params() {
-        let uri = http::Uri::builder()
-            .path_and_query("/update")
-            .build()
-            .unwrap();
+        let uri = Uri::builder().path_and_query("/update").build().unwrap();
         let query: Query<FritzBoxUpdateParams> = Query::try_from_uri(&uri).unwrap();
         insta::assert_debug_snapshot!(query, @r#"
     Query(
@@ -612,7 +610,7 @@ mod parse_query_params {
 
     #[test]
     fn ipv4() {
-        let uri = http::Uri::builder()
+        let uri = Uri::builder()
             .path_and_query("/update?ipv4=1.2.3.4")
             .build()
             .unwrap();
@@ -634,7 +632,7 @@ mod parse_query_params {
 
     #[test]
     fn ipv6() {
-        let uri = http::Uri::builder()
+        let uri = Uri::builder()
             .path_and_query("/update?ipv6=%3A%3A1234")
             .build()
             .unwrap();
@@ -656,7 +654,7 @@ mod parse_query_params {
 
     #[test]
     fn ipv4_and_ipv6() {
-        let uri = http::Uri::builder()
+        let uri = Uri::builder()
             .path_and_query("/update?ipv4=1.2.3.4&ipv6=%3A%3A1234")
             .build()
             .unwrap();
@@ -680,7 +678,7 @@ mod parse_query_params {
 
     #[test]
     fn ipv4_and_empty_ipv6() {
-        let uri = http::Uri::builder()
+        let uri = Uri::builder()
             .path_and_query("/update?ipv4=1.2.3.4&ipv6=")
             .build()
             .unwrap();
@@ -702,7 +700,7 @@ mod parse_query_params {
 
     #[test]
     fn empty_ipv4_and_ipv6() {
-        let uri = http::Uri::builder()
+        let uri = Uri::builder()
             .path_and_query("/update?ipv4=&ipv6=%3A%3A1234")
             .build()
             .unwrap();
