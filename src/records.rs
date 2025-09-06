@@ -1,6 +1,9 @@
 //! Deal with the DNS records
 
-use miette::{LabeledSpan, Result, ensure, miette};
+use miette::LabeledSpan;
+use miette::Result;
+use miette::ensure;
+use miette::miette;
 
 pub fn validate_record_str(record: &str) -> Result<()> {
     validate_line(0, record).map_err(|err| err.with_source_code(String::from(record)))

@@ -7,7 +7,9 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
 
 use base64::prelude::*;
-use miette::{Context, IntoDiagnostic, Result};
+use miette::Context;
+use miette::IntoDiagnostic;
+use miette::Result;
 use ring::digest::Digest;
 
 /// Create a password file

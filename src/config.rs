@@ -1,11 +1,13 @@
-use std::{
-    fs::File,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    path::PathBuf,
-};
+use std::fs::File;
+use std::net::IpAddr;
+use std::net::Ipv4Addr;
+use std::net::Ipv6Addr;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 
 use axum_client_ip::ClientIpSource;
-use miette::{Context, IntoDiagnostic};
+use miette::Context;
+use miette::IntoDiagnostic;
 
 #[derive(Debug, serde::Deserialize)]
 #[cfg_attr(test, derive(serde::Serialize))]

@@ -1,7 +1,8 @@
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use tower_http::validate_request::ValidateRequestHeaderLayer;
-use tracing::{trace, warn};
+use tracing::trace;
+use tracing::warn;
 
 use crate::password;
 

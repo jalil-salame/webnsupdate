@@ -1,23 +1,32 @@
-use std::{
-    io::ErrorKind,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::io::ErrorKind;
+use std::net::IpAddr;
+use std::net::Ipv4Addr;
+use std::net::Ipv6Addr;
+use std::net::SocketAddr;
+use std::path::Path;
+use std::path::PathBuf;
+use std::time::Duration;
 
-use axum::{
-    Router,
-    extract::{Query, State},
-    routing::get,
-};
+use axum::Router;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::routing::get;
 use axum_client_ip::ClientIp;
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use clap::{Parser, Subcommand};
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use clap::Parser;
+use clap::Subcommand;
 use clap_verbosity_flag::Verbosity;
 use config::Config;
 use http::StatusCode;
-use miette::{Context, IntoDiagnostic, Result, bail, ensure};
-use tracing::{debug, error, info};
+use miette::Context;
+use miette::IntoDiagnostic;
+use miette::Result;
+use miette::bail;
+use miette::ensure;
+use tracing::debug;
+use tracing::error;
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 mod auth;

@@ -1,13 +1,13 @@
-use std::{
-    ffi::OsStr,
-    net::IpAddr,
-    path::Path,
-    process::{ExitStatus, Stdio},
-    time::Duration,
-};
+use std::ffi::OsStr;
+use std::net::IpAddr;
+use std::path::Path;
+use std::process::ExitStatus;
+use std::process::Stdio;
+use std::time::Duration;
 
 use tokio::io::AsyncWriteExt;
-use tracing::{debug, warn};
+use tracing::debug;
+use tracing::warn;
 
 pub enum Action<'a> {
     // Reassign a domain to a different IP
@@ -99,11 +99,14 @@ fn update_ns_records<'a>(
 
 #[cfg(test)]
 mod test {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::net::IpAddr;
+    use std::net::Ipv4Addr;
+    use std::net::Ipv6Addr;
 
     use insta::assert_snapshot;
 
-    use super::{Action, update_ns_records};
+    use super::Action;
+    use super::update_ns_records;
     use crate::DEFAULT_TTL;
 
     #[test]
