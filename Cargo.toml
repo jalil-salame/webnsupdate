@@ -9,6 +9,7 @@ keywords = ["dns", "dyndns", "dynamic-ip"]
 categories = ["networking", "dns", "dyndns"]
 repository = "https://github.com/jalil-salame/webnsupdate"
 publish = ["git-salame-cl"]
+include = ["src/**/*", "LICENSE", "README.md", "CHANGELOG.md"]
 
 [lints.clippy]
 allow_attributes = "warn"
