@@ -57,7 +57,7 @@ impl FritzBoxUpdateParams {
     }
 }
 
-#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct Ipv6Prefix {
     prefix: Ipv6Addr,
@@ -257,14 +257,12 @@ async fn update_from_ip(
     .await
 }
 
-#[tracing::instrument(skip(state, ip), level = "trace", ret(level = "info"))]
+#[tracing::instrument(skip(state, ip), level = "trace", err)]
 async fn update_from_query(
     state: crate::AppState<'static>,
     ip: IpAddr,
     update_params: FritzBoxUpdateParams,
 ) -> Result<&'static str, UpdateError> {
-    // FIXME: mark suspicious updates (where IP doesn't match the update_ip) and
-    // reject them based on policy
     let FritzBoxUpdateParams {
         domain,
         ipv4,
@@ -272,6 +270,24 @@ async fn update_from_query(
         ipv6prefix: prefix,
         dualstack: _,
     } = update_params;
+
+    // TODO: configurable policy for suspicious updates
+    match ip {
+        IpAddr::V4(ip) => {
+            if let Some(ipv4) = ipv4
+                && ipv4 != ip
+            {
+                warn!("suspicious update; request from {ip} updates to {ipv4}");
+            }
+        }
+        IpAddr::V6(ip) => {
+            if let Some(ipv6) = ipv6
+                && ipv6 != ip
+            {
+                warn!("suspicious update; request from {ip} updates to {ipv6}");
+            }
+        }
+    }
 
     let ips = IpPair::new(ipv4, ipv6).add_if_missing(ip);
     tracing::debug!("requested update for {ips:?}");
@@ -323,7 +339,7 @@ async fn update_from_query(
     .await
 }
 
-#[tracing::instrument(skip(state, update_params), level = "trace", ret(level = "info"))]
+#[tracing::instrument(fields(ip = %ip), skip_all, level = "trace", err)]
 pub async fn update_records(
     State(state): State<crate::AppState<'static>>,
     ClientIp(ip): ClientIp,
@@ -338,12 +354,15 @@ pub async fn update_records(
     }
 }
 
-#[tracing::instrument(skip_all, fields(domain = %record_update.domain), level = "trace", ret(level = "info"))]
+#[tracing::instrument(skip_all, fields(domain = %record_update.domain), level = "trace", err)]
 async fn trigger_update(
     record_update: crate::nsupdate::RecordUpdate<'_>,
     state: &AppState<'static>,
 ) -> Result<&'static str, UpdateError> {
-    let mut actions = record_update.actions()?.peekable();
+    info!("triggering update {ips:?}", ips = record_update.ips);
+    let mut actions = record_update
+        .actions(state.saved_data.read().await.get(record_update.domain))?
+        .peekable();
 
     if actions.peek().is_none() {
         return Err(UpdateError::NoActions);
@@ -357,6 +376,7 @@ async fn trigger_update(
             // trigger a save to disk of the state
             state.trigger_save();
 
+            info!("successful update");
             Ok("Successfully updated IP of records!\n")
         }
         Ok(status) => {

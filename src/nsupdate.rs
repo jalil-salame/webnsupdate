@@ -31,20 +31,26 @@ pub struct RecordUpdate<'r> {
 
 impl<'r> RecordUpdate<'r> {
     /// Return the update [`Action`]s to take for this record update
-    pub fn actions(&self) -> Result<impl Iterator<Item = Action<'r>> + use<'r>, RecordUpdateError> {
+    pub fn actions(
+        &self,
+        data: Option<&SavedIps>,
+    ) -> Result<impl Iterator<Item = Action<'r>> + use<'r>, RecordUpdateError> {
         Ok(self
-            .ipv4_action()
+            .ipv4_action(data)
             .into_iter()
-            .chain(self.ipv6_action()?)
-            .chain(self.router_action()?))
+            .chain(self.ipv6_action(data)?)
+            .chain(self.router_action(data)?))
     }
 
     pub fn save_data(&self, data: &mut SavedData) {
         data.update(self.domain, self.ips, self.prefix);
     }
 
-    fn into_actions(self) -> Result<impl Iterator<Item = Action<'r>>, RecordUpdateError> {
-        self.actions()
+    fn into_actions(
+        self,
+        data: Option<&SavedIps>,
+    ) -> Result<impl Iterator<Item = Action<'r>>, RecordUpdateError> {
+        self.actions(data)
     }
 
     // helper method
@@ -56,18 +62,62 @@ impl<'r> RecordUpdate<'r> {
         }
     }
 
+    #[must_use]
+    fn needs_ipv4_update(&self, saved: &SavedIps) -> bool {
+        match (self.ips.ipv4, saved.ipv4) {
+            (None, None | Some(_)) => false,
+            // no saved ipv4
+            (Some(_), None) => true,
+            // ipv4 changed
+            (Some(update), Some(saved)) => update != saved,
+        }
+    }
+
     /// Action to update the domain's A record
-    fn ipv4_action(&self) -> Option<Action<'r>> {
+    fn ipv4_action(&self, data: Option<&SavedIps>) -> Option<Action<'r>> {
         if !self.record.ip_type.accepts_ipv4() {
+            return None;
+        }
+
+        // skip already updated
+        if data.is_some_and(|saved| !self.needs_ipv4_update(saved)) {
             return None;
         }
 
         Some(self.action(self.ips.ipv4?))
     }
 
+    #[must_use]
+    fn needs_ipv6_update(&self, saved: &SavedIps) -> bool {
+        match (self.ips.ipv6, saved.ipv6) {
+            // no updated ipv6
+            (None, None | Some(_)) => false,
+            // no saved ipv6
+            (Some(_), None) => true,
+            // ipv6 changed
+            (Some(update), Some(saved)) if update != saved => true,
+            // same ipv6, check if ipv6prefix changed
+            (Some(_), Some(_)) => match (self.prefix, saved.ipv6prefix) {
+                (None, None | Some(_)) => false,
+                // no saved ipv6prefix
+                (Some(_), None) => true,
+                // ipv6prefix changed
+                (Some(update), Some(saved)) => update != saved,
+            },
+        }
+    }
+
     /// Action to update the domain's AAAA record
-    fn ipv6_action(&self) -> Result<Option<Action<'r>>, RecordUpdateError> {
+    fn ipv6_action(
+        &self,
+        data: Option<&SavedIps>,
+    ) -> Result<Option<Action<'r>>, RecordUpdateError> {
         if !self.record.ip_type.accepts_ipv6() {
+            return Ok(None);
+        }
+
+        // skip already updated
+        if data.is_some_and(|saved| !self.needs_ipv6_update(saved)) {
             return Ok(None);
         }
 
@@ -76,17 +126,26 @@ impl<'r> RecordUpdate<'r> {
     }
 
     /// Action to update the Router's domain
-    fn router_action(&self) -> Result<Option<Action<'r>>, RecordUpdateError> {
+    fn router_action(
+        &self,
+        data: Option<&SavedIps>,
+    ) -> Result<Option<Action<'r>>, RecordUpdateError> {
         if !self.record.ip_type.accepts_ipv6() {
             return Ok(None);
         }
 
+        // has ipv6 update
         let (Some(domain), Some(ip)) = (self.record.router_domain.as_deref(), self.ips.ipv6) else {
             return Ok(None);
         };
 
         if self.record.client_id.is_none() {
             return Err(RecordUpdateError::NoClientId);
+        }
+
+        // skip already updated
+        if data.is_some_and(|saved| saved.ipv6.is_some_and(|saved| saved == ip)) {
+            return Ok(None);
         }
 
         Ok(Some(Action::Reassign {
@@ -231,8 +290,8 @@ impl<'a> Action<'a> {
                     record,
                     prefix: ips.ipv6prefix,
                     ips: ips.into(),
-                }
-                .into_actions()
+                } // ignore saved data, we are restoring it
+                .into_actions(None)
                 .inspect_err(|err| {
                     tracing::warn!("couldn't restore saved data for {domain}: {err}");
                 })
