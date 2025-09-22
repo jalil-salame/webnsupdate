@@ -18,31 +18,27 @@ in
       ...
     }:
     let
-      craneLib = (crane.mkLib pkgs).overrideToolchain (pkgs: pkgs.rust-bin.stable.latest.default);
-      src = craneLib.cleanCargoSource inputs.self;
+      craneLib = (crane.mkLib pkgs).overrideToolchain (
+        pkgs: pkgs.rust-bin.stable.latest.minimal.override { extensions = [ "clippy" ]; }
+      );
+      # Only keep snapshot files
+      snapshotFilter = path: _type: builtins.match ".*snap$" path != null;
+      snapshotOrCargo = path: type: (snapshotFilter path type) || (craneLib.filterCargoSources path type);
+      src = lib.cleanSourceWith {
+        src = inputs.self;
+        filter = snapshotOrCargo;
+        name = "source";
+      };
 
-      commonArgs = {
-        inherit src;
-        strictDeps = true;
-
-        doCheck = false; # tests will be run in the `checks` derivation
-        NEXTEST_HIDE_PROGRESS_BAR = 1;
-        NEXTEST_FAILURE_OUTPUT = "immediate-final";
-
-        nativeBuildInputs = [ pkgs.mold ];
-
-        meta = {
-          license = lib.licenses.mit;
-          homepage = "https://github.com/jalil-salame/webnsupdate";
-          mainProgram = "webnsupdate";
-        };
+      commonArgs = import ../common-args.nix {
+        inherit src lib;
+        inherit (pkgs) mold;
       };
 
       cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-      withArtifacts = lib.mergeAttrsList [
-        commonArgs
-        { inherit cargoArtifacts; }
-      ];
+      withArtifacts = commonArgs // {
+        inherit cargoArtifacts;
+      };
       webnsupdate = pkgs.callPackage ../default.nix {
         inherit craneLib cargoArtifacts src;
       };
@@ -55,7 +51,7 @@ in
       };
 
       checks = {
-        nextest = craneLib.cargoNextest withArtifacts;
+        nextest = craneLib.cargoNextest (withArtifacts // { doCheck = true; });
         deny = craneLib.cargoDeny commonArgs;
         clippy = craneLib.cargoClippy (
           lib.mergeAttrsList [

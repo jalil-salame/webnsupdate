@@ -414,13 +414,13 @@ mod test {
         );
         update_ns_records(&mut buf, actions).unwrap();
 
-        assert_snapshot!(String::from_utf8(buf).unwrap(), @r###"
+        assert_snapshot!(String::from_utf8(buf).unwrap(), @r"
         server 127.0.0.1
-        update delete example.com. 60 IN A
-        update add    example.com. 60 IN A 127.0.0.1
+        update delete example.com. 600 IN A
+        update add    example.com. 600 IN A 127.0.0.1
         send
         quit
-        "###);
+        ");
     }
 
     #[test]
@@ -434,13 +434,13 @@ mod test {
         );
         update_ns_records(&mut buf, actions).unwrap();
 
-        assert_snapshot!(String::from_utf8(buf).unwrap(), @r###"
+        assert_snapshot!(String::from_utf8(buf).unwrap(), @r"
         server 127.0.0.1
-        update delete example.com. 60 IN AAAA
-        update add    example.com. 60 IN AAAA ::1
+        update delete example.com. 600 IN AAAA
+        update add    example.com. 600 IN AAAA ::1
         send
         quit
-        "###);
+        ");
     }
 
     #[test]
@@ -457,14 +457,14 @@ mod test {
         );
         update_ns_records(&mut buf, actions).unwrap();
 
-        assert_snapshot!(String::from_utf8(buf).unwrap(), @r###"
+        assert_snapshot!(String::from_utf8(buf).unwrap(), @r"
         server 127.0.0.1
-        update delete example.com. 60 IN A
-        update add    example.com. 60 IN A 127.0.0.1
-        update delete example.com. 60 IN AAAA
-        update add    example.com. 60 IN AAAA ::1
+        update delete example.com. 600 IN A
+        update add    example.com. 600 IN A 127.0.0.1
+        update delete example.com. 600 IN AAAA
+        update add    example.com. 600 IN AAAA ::1
         send
         quit
-        "###);
+        ");
     }
 }
