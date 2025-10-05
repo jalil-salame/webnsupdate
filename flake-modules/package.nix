@@ -19,7 +19,13 @@ in
     }:
     let
       craneLib = (crane.mkLib pkgs).overrideToolchain (
-        pkgs: pkgs.rust-bin.stable.latest.minimal.override { extensions = [ "clippy" ]; }
+        pkgs:
+        pkgs.rust-bin.stable.latest.minimal.override {
+          extensions = [
+            "clippy"
+            "llvm-tools"
+          ];
+        }
       );
       # Only keep snapshot files
       snapshotFilter = path: _type: builtins.match ".*snap$" path != null;
@@ -51,7 +57,14 @@ in
       };
 
       checks = {
-        nextest = craneLib.cargoNextest (withArtifacts // { doCheck = true; });
+        nextest = craneLib.cargoNextest (
+          withArtifacts
+          // {
+            doCheck = true;
+            withLlvmCov = true;
+            cargoLlvmCovExtraArgs = "--lcov --output-path $out/coverage.info";
+          }
+        );
         deny = craneLib.cargoDeny commonArgs;
         clippy = craneLib.cargoClippy (
           lib.mergeAttrsList [
