@@ -1,0 +1,26 @@
+on:
+  push:
+    branches: ['main']
+  pull_request:
+permissions: read-all
+jobs:
+  release-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }} # checkout the branch instead of the pull request ref
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install release-plz
+        uses: taiki-e/install-action@v2
+        with:
+          tool: release-plz
+      - name: Release dry-run
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          release-plz release --verbose --forge=github --git-token="${GITHUB_TOKEN}" --token="${GITHUB_TOKEN}" --registry=crates-io --dry-run
