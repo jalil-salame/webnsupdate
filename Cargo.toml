@@ -8,7 +8,7 @@ readme = "README.md"
 keywords = ["dns", "dyndns", "dynamic-ip"]
 categories = ["networking", "dns", "dyndns"]
 repository = "https://github.com/jalil-salame/webnsupdate"
-publish = ["git-salame-cl"]
+publish = ["git-salame-cl", "crates-io"]
 include = ["src/**/*", "LICENSE", "README.md", "CHANGELOG.md"]
 
 [lints.clippy]
