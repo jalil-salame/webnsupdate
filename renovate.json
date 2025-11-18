@@ -10,6 +10,7 @@
   "dependencyDashboard": true,
   "extends": [
     "config:best-practices",
+    ":maintainLockFilesWeekly",
     ":preserveSemverRanges"
   ],
   "prCreation": "immediate",
@@ -20,16 +21,7 @@
     "enabled": true
   },
   "lockFileMaintenance": {
-    "enabled": true,
     "recreateWhen": "always",
-    "rebaseWhen": "behind-base-branch",
-    "branchTopic": "lock-file-maintenance",
-    "commitMessageAction": "Lock file maintenance",
-    "schedule": [
-      "* 22 * * *"
-    ]
-  },
-  "automergeSchedule": [
-    "* 23 * * *"
-  ]
+    "rebaseWhen": "behind-base-branch"
+  }
 }
