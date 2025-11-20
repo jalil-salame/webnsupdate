@@ -1,7 +1,7 @@
 [package]
 description = "An HTTP server using HTTP basic auth to make secure calls to nsupdate"
 name = "webnsupdate"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2024"
 license = "MIT"
 readme = "README.md"
