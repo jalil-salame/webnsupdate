@@ -9,7 +9,7 @@ jobs:
     outputs:
       outPath: ${{ steps.build.outputs.outPath }}
     steps:
-      - uses: https://git.salame.cl/actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+      - uses: https://git.salame.cl/actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
       - run: nix --version
       - name: Build Package
         id: build
@@ -37,7 +37,7 @@ jobs:
       TEST: ${{ matrix.test }}
       SYSTEM: ${{ matrix.system }}
     steps:
-      - uses: https://git.salame.cl/actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+      - uses: https://git.salame.cl/actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
       - run: nix --version
       - name: Run tests
         run: |
@@ -47,7 +47,7 @@ jobs:
     runs-on: nixos
     needs: checks
     steps:
-      - uses: https://git.salame.cl/actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+      - uses: https://git.salame.cl/actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           fetch-depth: 0 # fetch full history (needed for changelog)
           ref: ${{ forge.head_ref }} # checkout the branch instead of the pull request ref
@@ -64,7 +64,7 @@ jobs:
     runs-on: nixos
     needs: build
     steps:
-      - uses: https://git.salame.cl/actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+      - uses: https://git.salame.cl/actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
       - run: nix --version
       - name: Generate size report
         uses: "https://git.salame.cl/jalil/nix-flake-outputs-size@a12d3f759fcdd432ed9909a812a3150c88eae23a" # main
