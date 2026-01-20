@@ -41,6 +41,7 @@ in
         name = "release-script";
         runtimeInputs = [ pkgs.release-plz ];
         text = ''
+          release-plz --version
           declare -ra release_args=(--registry=git-salame-cl --forge=gitea)
           case "$FORGEJO_REF" in
             # On main create a release
