@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.4.3 - 2025-11-07
+## [0.4.3](https://git.salame.cl/jalil/webnsupdate/compare/v0.4.2...v0.4.3) - 2025-11-07
 
 
 ### <!-- 7 -->⚙️ Miscellaneous Tasks
@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - release v0.4.3
 
 
-## v0.4.2 - 2025-10-12
+## [0.4.2](https://git.salame.cl/jalil/webnsupdate/compare/v0.4.1...v0.4.2) - 2025-10-12
 
 
 ### <!-- 1 -->🐛 Bug Fixes
@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - release v0.4.2
 
 
-## v0.4.1 - 2025-10-07
+## [0.4.1](https://git.salame.cl/jalil/webnsupdate/compare/v0.4.0...v0.4.1) - 2025-10-07
 
 
 ### <!-- 1 -->🐛 Bug Fixes
@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - release v0.4.1
 
 
-## v0.4.0 - 2025-09-18
+## [0.4.0](https://git.salame.cl/jalil/webnsupdate/compare/v0.3.7...v0.4.0) - 2025-09-18
 
 
 ### <!-- 1 -->🐛 Bug Fixes
@@ -80,7 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - release v0.3.8
 
 
-## v0.3.7 - 2025-08-29
+## [0.3.7](https://git.salame.cl/jalil/webnsupdate/compare/v0.3.6...v0.3.7) - 2025-08-29
 
 
 ### <!-- 0 -->🚀 Features
@@ -196,7 +196,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - *(release)* fix typo in cargo registry token
 
 
-## v0.3.6 - 2025-01-26
+## [0.3.6](https://git.salame.cl/jalil/webnsupdate/compare/v0.3.5...v0.3.6) - 2025-01-26
 
 
 ### <!-- 0 -->🚀 Features
@@ -206,7 +206,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - *(flake)* add tests for new allowedIPVersion option
 
 
-## v0.3.5 - 2025-01-23
+## [0.3.5](https://git.salame.cl/jalil/webnsupdate/compare/v0.3.4...v0.3.5) - 2025-01-23
 
 
 ### <!-- 0 -->🚀 Features
@@ -243,7 +243,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - parallelize checks
 
 
-## v0.3.4 - 2024-12-26
+## [0.3.4](https://git.salame.cl/jalil/webnsupdate/compare/v0.3.3...v0.3.4) - 2024-12-26
 
 
 ### <!-- 1 -->🐛 Bug Fixes
@@ -251,7 +251,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - *(main)* add more logging and default to info
 
 
-## v0.3.3 - 2024-12-22
+## [0.3.3](https://git.salame.cl/jalil/webnsupdate/compare/v0.3.2...v0.3.3) - 2024-12-22
 
 
 ### <!-- 0 -->🚀 Features
@@ -272,7 +272,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - generate base changelog
 
 
-## v0.3.2 - 2024-11-23
+## [0.3.2](https://git.salame.cl/jalil/webnsupdate/compare/v0.3.1...v0.3.2) - 2024-11-23
 
 
 ### <!-- 0 -->🚀 Features
@@ -297,7 +297,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - update flake inputs
 
 
-## v0.3.1 - 2024-10-28
+## [0.3.1](https://git.salame.cl/jalil/webnsupdate/compare/v0.3.0...v0.3.1) - 2024-10-28
 
 
 ### <!-- 1 -->🐛 Bug Fixes
@@ -309,7 +309,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - next dev version
 
 
-## v0.3.0 - 2024-10-28
+## [0.3.0](https://git.salame.cl/jalil/webnsupdate/compare/v0.2.0...v0.3.0) - 2024-10-28
 
 
 ### <!-- 0 -->🚀 Features
@@ -341,7 +341,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - bump version
 
 
-## v0.2.0 - 2024-06-02
+## 0.2.0 - 2024-06-02
 
 
 ### <!-- 10 -->💼 Other
