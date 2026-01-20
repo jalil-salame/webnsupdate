@@ -1,6 +1,5 @@
 [workspace]
 allow_dirty = false             # no unstaged changes
-changelog_config = "cliff.toml" # git-cliff config
 changelog_update = true         # update the changelog
 dependencies_update = false     # renovate handles updates
 git_release_enable = true       # create a Forgejo release
@@ -10,3 +9,72 @@ pr_labels = ["release"]         # label as a release
 publish = true                  # publish crate to registry
 publish_timeout = "10m"         # timeout publish after 10m
 release = true                  # enable releases
+
+
+[changelog]
+# template for the changelog header
+header = """# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+"""
+# template for the changelog body
+# https://keats.github.io/tera/docs/#introduction
+body = """
+
+{% if version %}
+## \
+    {% if release_link -%}\
+        [{{ version }}]({{ release_link }})\
+    {%- else -%}\
+        {{ version }}\
+    {% endif %} \
+    - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}
+## Unreleased
+{% endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+
+    {% for commit in commits %}
+        {%- if commit.scope -%}
+            - *({{commit.scope}})* {% if commit.breaking %}[**breaking**] {% endif %}\
+                {{ commit.message }}\
+                {%- if commit.links %} \
+                    ({% for link in commit.links %}[{{link.text}}]({{link.href}}) {% endfor -%})\
+                {% endif %}
+        {% else -%}
+            - {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message }}
+        {% endif -%}
+    {% endfor -%}
+{% endfor %}
+"""
+# sort the commits inside sections by oldest/newest order
+sort_commits = "oldest"
+# remove the leading and trailing spaces
+trim = true
+# regex for parsing and grouping commits
+commit_parsers = [
+  # skip irrelevant chores
+  { message = "^chore\\(release\\): prepare for", skip = true },
+  { message = "^chore\\(deps.*\\)", skip = true },
+  { message = "^chore\\(pr\\)", skip = true },
+  { message = "^chore\\(pull\\)", skip = true },
+  { message = "^chore: bump version", skip = true },
+
+  # Commit groups
+  { message = "^feat", group = "<!-- 0 -->🚀 Features" },
+  { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
+  { message = "^doc", group = "<!-- 3 -->📚 Documentation" },
+  { message = "^perf", group = "<!-- 4 -->⚡ Performance" },
+  { message = "^refactor", group = "<!-- 2 -->🚜 Refactor" },
+  { message = "^style", group = "<!-- 5 -->🎨 Styling" },
+  { message = "^test", group = "<!-- 6 -->🧪 Testing" },
+  { message = "^chore|^ci", group = "<!-- 7 -->⚙️ Miscellaneous Tasks" },
+  { body = ".*security", group = "<!-- 8 -->🛡️ Security" },
+  { message = "^revert", group = "<!-- 9 -->◀️ Revert" },
+  { message = ".*", group = "<!-- 10 -->💼 Other" },
+]
