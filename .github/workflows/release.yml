@@ -22,7 +22,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Release with release-plz
-        uses: release-plz/action@5ab144c9d67d4346240190d0f95ed08668677928 # v0.5
+        uses: release-plz/action@adcc7904c46f9595dab7534d05c3fee773eac4bc # v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
