@@ -44,3 +44,7 @@ Using a flake NixOS configuration add these lines:
   };
 }
 ```
+
+## Update URL format
+
+Follow the Fritz!BOX format for update URLs: <https://fritzhelp.avm.de/help/en/FRITZ-Box-7530-AX/avm/024p2/hilfe_dyndns_update_url_bauen>
