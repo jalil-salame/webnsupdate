@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.4.4](https://git.salame.cl/jalil/webnsupdate/compare/v0.4.3...v0.4.4) - 2026-02-11
+
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- *(changelog)* regenerate with new configuration
+- *(changelog)* add links to tag comparisons
+
+### <!-- 3 -->📚 Documentation
+
+- *(README)* link to Fritz!BOX's docs on DynDNS
+
 ## [0.4.3](https://git.salame.cl/jalil/webnsupdate/compare/v0.4.2...v0.4.3) - 2025-11-07
 
 
