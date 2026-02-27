@@ -31,7 +31,7 @@ mod records;
 mod state;
 mod update_handler;
 
-const DEFAULT_TTL: Duration = Duration::from_secs(600);
+const DEFAULT_TTL: Duration = Duration::from_mins(10);
 const DEFAULT_SALT: &str = "UpdateMyDNS";
 
 #[derive(Clone)]
