@@ -46,7 +46,7 @@ jobs:
           nix build --print-build-logs \
             .#checks."$SYSTEM"."$TEST"
   trigger-release:
-    runs-on: nixos
+    runs-on: nixos-taurus
     needs: checks
     steps:
       - name: Checkout Repo
@@ -63,7 +63,7 @@ jobs:
         run: |
           nix develop .#release --command release-script
   report-size:
-    runs-on: nixos
+    runs-on: nixos-taurus
     needs: build
     steps:
       - name: Checkout Repo
