@@ -39,12 +39,15 @@
               dynamicZonesDir = "${bindData}/zones";
             in
             {
-              services.bind.zones.${testDomain} = {
-                master = true;
-                file = "${dynamicZonesDir}/${testDomain}";
-                extraConfig = ''
-                  allow-update { key rndc-key; };
-                '';
+              services.bind = {
+                checkConfig = false; # FIXME: broken due to dynamic patch, skip until patch is upstreamed
+                zones.${testDomain} = {
+                  master = true;
+                  file = "${dynamicZonesDir}/${testDomain}";
+                  extraConfig = ''
+                    allow-update { key rndc-key; };
+                  '';
+                };
               };
 
               systemd.services.bind.preStart = ''
