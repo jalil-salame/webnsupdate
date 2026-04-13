@@ -16,7 +16,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install release-plz
-        uses: taiki-e/install-action@0abfcd587b70a713fdaa7fb502c885e2112acb15 # v2
+        uses: taiki-e/install-action@921a4027af787cda265c4f334a0f7f89b21d72e9 # v2
         with:
           tool: release-plz
       - name: Release dry-run
