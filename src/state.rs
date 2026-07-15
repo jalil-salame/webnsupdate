@@ -94,12 +94,12 @@ impl<'p> SaveDataTask<'p> {
     }
 
     #[tracing::instrument(name = "trigger_save", fields(path = %self.path.display()), skip(buf, self), err)]
-    async fn trigger_save_impl(&self, mut buf: &mut Vec<u8>) -> miette::Result<()> {
+    async fn trigger_save_impl(&self, buf: &mut Vec<u8>) -> miette::Result<()> {
         buf.clear();
 
         // Serialize data to buffer
         tracing::debug!("serializing state to buffer");
-        serde_json::to_writer(&mut buf, &*self.state.read().await)
+        serde_json::to_writer(&mut *buf, &*self.state.read().await)
             .into_diagnostic()
             .wrap_err("failed to serialize state")?;
 

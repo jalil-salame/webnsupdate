@@ -193,10 +193,7 @@ async fn start_http_server(
     pass: Option<Box<[u8]>>,
 ) -> miette::Result<()> {
     let config::Server {
-        address,
-        ip_source,
-        key_file: _,
-        ..
+        address, ip_source, ..
     } = config.server;
 
     // Create router
