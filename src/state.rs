@@ -105,8 +105,8 @@ impl<'p> SaveDataTask<'p> {
 
         // Write data to file
         //
-        // This is synchronous to ensure it is not cancelled in the middle of the
-        // operation.
+        // This is synchronous to ensure it is not cancelled in the middle of
+        // the operation.
         tracing::debug!("writing state to disk");
         std::fs::write(self.path, buf.as_slice())
             .into_diagnostic()

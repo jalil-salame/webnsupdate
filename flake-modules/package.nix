@@ -69,7 +69,7 @@ in
         clippy = craneLib.cargoClippy (
           lib.mergeAttrsList [
             withArtifacts
-            { cargoClippyExtraArgs = "--all-targets -- --deny warnings"; }
+            { CARGO_BUILD_WARNINGS = "deny"; }
           ]
         );
       };

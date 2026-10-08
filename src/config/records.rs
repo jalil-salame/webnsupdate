@@ -55,8 +55,8 @@ impl Records {
 
     /// Check that there are no duplicated domains
     fn duplicate_domains(&self) -> impl Iterator<Item = miette::Error> {
-        // router_domain is optional so it will have at most the same elements as
-        // domains
+        // router_domain is optional so it will have at most the same elements
+        // as domains
         let router_domains: std::collections::HashSet<_> = self.router_domains().collect();
 
         self.domains()
@@ -227,7 +227,9 @@ impl std::str::FromStr for IpType {
             "both" => Ok(Self::Both),
             "ipv4-only" => Ok(Self::Ipv4Only),
             "ipv6-only" => Ok(Self::Ipv6Only),
-            _ => miette::bail!("expected one of 'ipv4-only', 'ipv6-only' or 'both', got '{s}'"),
+            _ => {
+                miette::bail!("expected one of 'ipv4-only', 'ipv6-only' or 'both', got '{s}'");
+            }
         }
     }
 }
