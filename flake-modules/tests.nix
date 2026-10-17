@@ -150,20 +150,21 @@
               builtins.throw "exclusive means one of ipv4 or ipv6 must be set, but not both"
             else
               ''
+                CURL: str = "curl --fail --no-progress-meter --show-error"
+
+                STATIC_DOMAINS: list[str] = ["${testDomain}", "ns1.${testDomain}", "nsupdate.${testDomain}"]
+                DYNAMIC_DOMAINS: list[tuple[str,str]] = [("test.${testDomain}","router.${testDomain}")]
+
                 IPV4: bool = ${if ipv4 then "True" else "False"}
                 IPV6: bool = ${if ipv6 then "True" else "False"}
                 NGINX: bool = ${if nginx then "True" else "False"}
                 EXCLUSIVE: bool = ${if exclusive then "True" else "False"}
+
                 print(f"{IPV4=} {IPV6=} {EXCLUSIVE=}")
 
-                CURL: str = "curl --fail --no-progress-meter --show-error"
-
-                machine.start(allow_reboot=True)
+                machine.start()
                 machine.wait_for_unit("bind.service")
                 machine.wait_for_unit("webnsupdate.service")
-
-                STATIC_DOMAINS: list[str] = ["${testDomain}", "ns1.${testDomain}", "nsupdate.${testDomain}"]
-                DYNAMIC_DOMAINS: list[tuple[str,str]] = [("test.${testDomain}","router.${testDomain}")]
 
                 def dig_cmd(domain: str, record: str, ip: str | None) -> tuple[str, str]:
                     match_ip = ".*IN\\s\\+{record}" if ip is None else f"\\s\\+600\\s\\+IN\\s\\+{record}\\s\\+{ip}$"
@@ -313,7 +314,17 @@
                             domain_missing(domain, "AAAA")
                             domain_missing(router, "AAAA")
 
-                machine.reboot()
+                with machine.nested("rebooting machine"):
+                    machine.log(f"shutdown machine (pid: {machine.get_systemd_process})")
+                    machine.shutdown()
+
+                    del machine.get_systemd_process
+                    machine._notify_ready = False
+
+                    with machine.nested("start machine"):
+                      machine.start()
+                      machine.log(f"started machine (pid: {machine.get_systemd_process})")
+
                 machine.succeed("cat ${lastIPPath}")
                 machine.wait_for_unit("webnsupdate.service")
                 machine.succeed("cat ${lastIPPath}")
@@ -345,17 +356,17 @@
         {
           module-ipv4-test = pkgs.testers.nixosTest {
             name = "webnsupdate-ipv4-module";
-            nodes.machine = webnsupdate-ipv4-machine;
+            containers.machine = webnsupdate-ipv4-machine;
             testScript = testTemplate { ipv4 = true; };
           };
           module-ipv6-test = pkgs.testers.nixosTest {
             name = "webnsupdate-ipv6-module";
-            nodes.machine = webnsupdate-ipv6-machine;
+            containers.machine = webnsupdate-ipv6-machine;
             testScript = testTemplate { ipv6 = true; };
           };
           module-nginx-test = pkgs.testers.nixosTest {
             name = "webnsupdate-nginx-module";
-            nodes.machine = webnsupdate-nginx-machine;
+            containers.machine = webnsupdate-nginx-machine;
             testScript = testTemplate {
               ipv4 = true;
               ipv6 = true;
@@ -364,7 +375,7 @@
           };
           module-ipv4-only-test = pkgs.testers.nixosTest {
             name = "webnsupdate-ipv4-only-module";
-            nodes.machine = webnsupdate-ipv4-only-machine;
+            containers.machine = webnsupdate-ipv4-only-machine;
             testScript = testTemplate {
               ipv4 = true;
               nginx = true;
@@ -373,7 +384,7 @@
           };
           module-ipv6-only-test = pkgs.testers.nixosTest {
             name = "webnsupdate-ipv6-only-module";
-            nodes.machine = webnsupdate-ipv6-only-machine;
+            containers.machine = webnsupdate-ipv6-only-machine;
             testScript = testTemplate {
               ipv6 = true;
               nginx = true;
