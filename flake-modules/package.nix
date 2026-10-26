@@ -57,14 +57,7 @@ in
       };
 
       checks = {
-        nextest = craneLib.cargoNextest (
-          withArtifacts
-          // {
-            doCheck = true;
-            withLlvmCov = true;
-            cargoLlvmCovExtraArgs = "--lcov --output-path $out/coverage.info";
-          }
-        );
+        nextest = craneLib.cargoNextest (withArtifacts // { doCheck = true; });
         deny = craneLib.cargoDeny commonArgs;
         clippy = craneLib.cargoClippy (
           lib.mergeAttrsList [
